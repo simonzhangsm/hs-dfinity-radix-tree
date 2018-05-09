@@ -3,6 +3,7 @@
 module Network.DFINITY.RadixTree.Types
    ( RadixPrefix(..)
    , RadixBranch(..)
+   , RadixTree(..)
    ) where
 
 import Codec.Serialise (Serialise(..))
@@ -11,8 +12,10 @@ import Codec.Serialise.Encoding (Encoding, encodeBytes, encodeInt, encodeListLen
 import Control.Monad (void)
 import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
+import Data.LruCache (LruCache)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
+import Database.LevelDB (DB)
 
 data RadixPrefix
    = RadixPrefix
@@ -54,6 +57,13 @@ instance Serialise RadixBranch where
       right <- decodeMaybe decodeSide
       leaf <- decodeLeaf len
       pure $ RadixBranch prefix left right leaf
+
+data RadixTree
+   = RadixTree
+   { _radixDB :: DB
+   , _radixCache :: LruCache ByteString ByteString
+   , _radixRoot :: RadixBranch
+   }
 
 encodeMaybe :: Serialise a => (a -> Encoding) -> Maybe a -> Encoding
 encodeMaybe = maybe encodeNull

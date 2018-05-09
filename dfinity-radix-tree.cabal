@@ -17,6 +17,7 @@ library
       bytestring,
       lens-simple,
       leveldb-haskell,
+      lrucaching,
       serialise
    default-language:
       Haskell2010
