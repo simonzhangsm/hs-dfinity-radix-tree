@@ -77,8 +77,8 @@ instance Serialise RadixBranch where
 
 data RadixTree
    = RadixTree
-   { _radixDB :: DB
-   , _radixCache :: LruCache ByteString ByteString
+   { _radixCache :: LruCache ByteString ByteString
+   , _radixDatabase :: DB
    , _radixRoot :: RadixBranch
    }
 
