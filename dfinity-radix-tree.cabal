@@ -15,6 +15,7 @@ library
    build-depends:
       base,
       bytestring,
+      deepseq,
       lens-simple,
       leveldb-haskell,
       lrucaching,
@@ -22,6 +23,7 @@ library
    default-language:
       Haskell2010
    exposed-modules:
+      Network.DFINITY.RadixTree
       Network.DFINITY.RadixTree.Bits
       Network.DFINITY.RadixTree.Lenses
       Network.DFINITY.RadixTree.Types

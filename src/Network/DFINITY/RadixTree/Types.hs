@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.DFINITY.RadixTree.Types
@@ -9,9 +10,11 @@ module Network.DFINITY.RadixTree.Types
 import Codec.Serialise (Serialise(..))
 import Codec.Serialise.Decoding (Decoder, TokenType(..), decodeBytes, decodeInt, decodeListLen, decodeNull, decodeTag, peekTokenType)
 import Codec.Serialise.Encoding (Encoding, encodeBytes, encodeInt, encodeListLen, encodeNull, encodeTag)
+import Control.DeepSeq (NFData(..))
 import Control.Monad (void)
 import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
+import Data.Data (Data)
 import Data.LruCache (LruCache)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
@@ -21,7 +24,13 @@ data RadixPrefix
    = RadixPrefix
    { _radixBitLen :: Int
    , _radixName :: ByteString
-   } deriving (Eq, Show)
+   } deriving (Data, Eq, Show)
+
+instance NFData RadixPrefix where
+   rnf RadixPrefix {..} =
+      rnf _radixBitLen `seq`
+      rnf _radixName `seq`
+      ()
 
 instance Serialise RadixPrefix where
    encode RadixPrefix {..} =
@@ -40,7 +49,15 @@ data RadixBranch
    , _radixLeft :: Maybe ByteString
    , _radixRight :: Maybe ByteString
    , _radixLeaf :: Maybe ByteString
-   } deriving (Eq, Show)
+   } deriving (Data, Eq, Show)
+
+instance NFData RadixBranch where
+   rnf RadixBranch {..} =
+      rnf _radixPrefix `seq`
+      rnf _radixLeft `seq`
+      rnf _radixRight `seq`
+      rnf _radixLeaf `seq`
+      ()
 
 instance Serialise RadixBranch where
    encode RadixBranch {..} =
