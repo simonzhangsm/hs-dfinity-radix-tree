@@ -26,6 +26,7 @@ library
       Network.DFINITY.RadixTree
       Network.DFINITY.RadixTree.Bits
       Network.DFINITY.RadixTree.Lenses
+      Network.DFINITY.RadixTree.Memory
       Network.DFINITY.RadixTree.Types
    ghc-options:
       -O2
