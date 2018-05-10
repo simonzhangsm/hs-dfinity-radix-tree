@@ -14,6 +14,7 @@ import Control.DeepSeq (NFData(..))
 import Control.Monad (void)
 import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.Data (Data)
 import Data.LruCache (LruCache)
 import Data.Maybe (isJust)
@@ -77,7 +78,7 @@ instance Serialise RadixBranch where
 
 data RadixTree
    = RadixTree
-   { _radixCache :: LruCache ByteString ByteString
+   { _radixCache :: LruCache ShortByteString ByteString
    , _radixDatabase :: DB
    , _radixRoot :: RadixBranch
    }
