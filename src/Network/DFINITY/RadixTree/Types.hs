@@ -2,8 +2,9 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.DFINITY.RadixTree.Types
-   ( RadixPrefix(..)
-   , RadixBranch(..)
+   ( RadixBranch(..)
+   , RadixCache
+   , RadixPrefix(..)
    , RadixTree(..)
    ) where
 
@@ -82,9 +83,11 @@ instance Serialise RadixBranch where
       leaf <- decodeLeaf len
       pure $ RadixBranch prefix left right leaf
 
+type RadixCache = LruCache ShortByteString ByteString
+
 data RadixTree
    = RadixTree
-   { _radixCache :: LruCache ShortByteString ByteString
+   { _radixCache :: RadixCache
    , _radixDatabase :: DB
    , _radixRoot :: RadixBranch
    }
