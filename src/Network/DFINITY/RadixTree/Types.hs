@@ -16,6 +16,7 @@ import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Data (Data)
+import Data.Default.Class (Default(..))
 import Data.LruCache (LruCache)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
@@ -61,6 +62,9 @@ instance NFData RadixBranch where
       rnf _radixRight `seq`
       rnf _radixLeaf `seq`
       ()
+
+instance Default RadixBranch where
+   def = RadixBranch Nothing Nothing Nothing Nothing
 
 instance Serialise RadixBranch where
    encode RadixBranch {..} =
