@@ -1,5 +1,6 @@
 module Network.DFINITY.RadixTree.Bits
    ( Bitable(..)
+   , matchBits
    ) where
 
 import Data.Bits ((.|.), setBit, testBit)
@@ -16,6 +17,12 @@ instance Bitable ByteString where
       go [] = []
       go xs = let (a, b) = splitAt 8 xs in toByte a : go b
    toBits = concatMap fromByte . unpack
+
+matchBits :: [Bool] -> [Bool] -> [Bool]
+matchBits x = map fst . zipWhile (==) x
+
+zipWhile :: (a -> b -> Bool) -> [a] -> [b] -> [(a,b)]
+zipWhile f x y = takeWhile (uncurry f) $ zip x y
 
 fromByte :: Word8 -> [Bool]
 fromByte = flip map order . testBit
