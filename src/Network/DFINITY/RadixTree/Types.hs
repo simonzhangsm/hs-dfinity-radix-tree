@@ -23,6 +23,7 @@ import Data.Maybe (isJust)
 import Data.Monoid ((<>))
 import Database.LevelDB (DB)
 
+import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Serialise
 
 data RadixPrefix
@@ -30,6 +31,13 @@ data RadixPrefix
    { _radixBitLen :: Int
    , _radixName :: ByteString
    } deriving (Data, Eq, Show)
+
+instance Bitable RadixPrefix where
+   toBits RadixPrefix {..} = take _radixBitLen $ toBits _radixName
+   fromBits bits = RadixPrefix bitLen name
+      where
+      bitLen = length bits
+      name = fromBits bits
 
 instance NFData RadixPrefix where
    rnf RadixPrefix {..} =
@@ -89,5 +97,5 @@ data RadixTree
    = RadixTree
    { _radixCache :: RadixCache
    , _radixDatabase :: DB
-   , _radixRoot :: RadixBranch
+   , _radixRoot :: ByteString
    }
