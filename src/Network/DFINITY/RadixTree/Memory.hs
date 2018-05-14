@@ -1,5 +1,6 @@
 module Network.DFINITY.RadixTree.Memory
-   ( load
+   ( free
+   , load
    , store
    ) where
 
@@ -8,9 +9,12 @@ import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (toShort)
 import Data.LruCache as LRU (insert, lookup)
-import Database.LevelDB (DB, defaultReadOptions, defaultWriteOptions, get, put)
+import Database.LevelDB (DB, defaultReadOptions, defaultWriteOptions, delete, get, put)
 
 import Network.DFINITY.RadixTree.Types
+
+free :: MonadIO m => DB -> ByteString -> m ()
+free database = delete database defaultWriteOptions
 
 load :: MonadIO m => RadixCache -> DB -> ByteString -> m (Maybe ByteString)
 load cache database key =
