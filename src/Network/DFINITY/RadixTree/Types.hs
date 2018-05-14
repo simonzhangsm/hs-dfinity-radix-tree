@@ -8,12 +8,13 @@ module Network.DFINITY.RadixTree.Types
    , RadixTree(..)
    ) where
 
-import Codec.Serialise (Serialise(..))
+import Codec.Serialise as CBOR (Serialise(..))
 import Codec.Serialise.Decoding (decodeBytes, decodeInt, decodeListLen)
 import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (void)
 import Data.Bool (bool)
+import Data.ByteString.Base16 as Base16 (encode)
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Data (Data)
@@ -30,7 +31,7 @@ data RadixPrefix
    = RadixPrefix
    { _radixBitLen :: Int
    , _radixName :: ByteString
-   } deriving (Data, Eq, Show)
+   } deriving (Data, Eq)
 
 instance Bitable RadixPrefix where
    toBits RadixPrefix {..} = take _radixBitLen $ toBits _radixName
@@ -56,13 +57,17 @@ instance Serialise RadixPrefix where
       name <- decodeBytes
       pure $ RadixPrefix bitLen name
 
+instance Show RadixPrefix where
+   show = map compress . toBits
+      where compress = bool '0' '1'
+
 data RadixBranch
    = RadixBranch
    { _radixPrefix :: Maybe RadixPrefix
    , _radixLeft :: Maybe ByteString
    , _radixRight :: Maybe ByteString
    , _radixLeaf :: Maybe ByteString
-   } deriving (Data, Eq, Show)
+   } deriving (Data, Eq)
 
 instance NFData RadixBranch where
    rnf RadixBranch {..} =
@@ -78,7 +83,7 @@ instance Default RadixBranch where
 instance Serialise RadixBranch where
    encode RadixBranch {..} =
       encodeListLen len <>
-      encodeMaybe encode _radixPrefix <>
+      encodeMaybe CBOR.encode _radixPrefix <>
       encodeMaybe encodeSide _radixLeft <>
       encodeMaybe encodeSide _radixRight <>
       maybe mempty encodeBytes _radixLeaf
@@ -90,6 +95,19 @@ instance Serialise RadixBranch where
       right <- decodeMaybe decodeSide
       leaf <- decodeLeaf len
       pure $ RadixBranch prefix left right leaf
+
+instance Show RadixBranch where
+   show RadixBranch {..} = concat
+      [ "RadixBranch { _radixPrefix = "
+      , show _radixPrefix
+      , ", _radixLeft = "
+      , show $ Base16.encode <$> _radixLeft
+      , ", _radixRight = "
+      , show $ Base16.encode <$> _radixRight
+      , ", _radixLeaf = "
+      , show _radixLeaf
+      , " }"
+      ]
 
 type RadixCache = LruCache ShortByteString ByteString
 
