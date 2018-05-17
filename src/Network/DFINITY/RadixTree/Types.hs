@@ -8,14 +8,16 @@ module Network.DFINITY.RadixTree.Types
    , RadixTree(..)
    ) where
 
-import Codec.Serialise as CBOR (Serialise(..))
+import Codec.Serialise as CBOR (Serialise(..), serialise)
 import Codec.Serialise.Decoding (decodeBytes, decodeInt, decodeListLen)
 import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
+import Crypto.Hash.SHA256 (hash)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (void)
 import Data.Bool (bool)
 import Data.ByteString.Base16 as Base16 (encode)
-import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 (ByteString, unpack)
+import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Short (ShortByteString)
 import Data.Data (Data)
 import Data.Default.Class (Default(..))
@@ -23,6 +25,7 @@ import Data.LruCache (LruCache)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
 import Database.LevelDB (DB)
+import Text.Printf (printf)
 
 import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Serialise
@@ -97,17 +100,18 @@ instance Serialise RadixBranch where
       pure $ RadixBranch prefix left right leaf
 
 instance Show RadixBranch where
-   show RadixBranch {..} = concat
-      [ "RadixBranch { _radixPrefix = "
-      , show _radixPrefix
-      , ", _radixLeft = "
-      , show $ Base16.encode <$> _radixLeft
-      , ", _radixRight = "
-      , show $ Base16.encode <$> _radixRight
-      , ", _radixLeaf = "
-      , show _radixLeaf
-      , " }"
-      ]
+   show branch@RadixBranch {..} =
+      case color 7 . unpack <$> _radixLeaf of
+         Nothing -> printf "%s@[%s,%s,%s]" root prefix left right
+         Just leaf -> printf "%s@[%s,%s,%s,%s]" root prefix left right leaf
+      where
+      color :: Int -> String -> String
+      color = printf "\ESC[9%dm%s\ESC[0m"
+      format = take 8 . unpack . Base16.encode
+      root = color 4 $ format $ hash $ toStrict $ serialise branch
+      prefix = color 7 $ maybe "null" show _radixPrefix
+      left = color 4 $ maybe "null" format _radixLeft
+      right = color 4 $ maybe "null" format _radixRight
 
 type RadixCache = LruCache ShortByteString ByteString
 
