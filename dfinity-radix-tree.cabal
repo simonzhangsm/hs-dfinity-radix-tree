@@ -14,11 +14,15 @@ cabal-version: >=1.10
 library
    build-depends:
       base,
+      base16-bytestring,
       bytestring,
+      cryptohash-sha256,
+      data-default-class,
       deepseq,
       lens-simple,
       leveldb-haskell,
       lrucaching,
+      resourcet,
       serialise
    default-language:
       Haskell2010
