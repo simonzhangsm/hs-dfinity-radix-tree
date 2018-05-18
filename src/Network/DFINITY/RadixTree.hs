@@ -146,8 +146,7 @@ insertRadixTree key value tree@RadixTree {..} =
    then do
       -- Base case.
       free _radixDatabase _radixRoot
-      let bits = toBits key
-      let prefix = if null bits then Nothing else Just $ fromBits bits
+      let prefix = toPrefix $ toBits key
       let branch = RadixBranch prefix Nothing Nothing $ Just value
       (cache, root) <- store _radixCache _radixDatabase branch
       pure $ RadixTree cache _radixDatabase root
