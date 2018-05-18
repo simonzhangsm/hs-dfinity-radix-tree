@@ -57,11 +57,11 @@ searchRadixTree
    :: MonadIO m
    => ByteString -- ^ Key.
    -> RadixTree -- ^ Radix tree.
-   -> m (RadixBranch, [ByteString], [[Bool]], [Bool], [Bool])
+   -> m ([RadixBranch], [ByteString], [[Bool]], [Bool], [Bool])
 searchRadixTree = flip $ \ tree ->
-   go tree Nothing [] [] . toBits
+   go tree Nothing [] [] [] . toBits
    where
-   go RadixTree {..} implicit roots prefixes key = do
+   go RadixTree {..} implicit branches roots prefixes key = do
       -- Load the state root.
       result <- load _radixCache _radixDatabase _radixRoot
       case result of
@@ -72,19 +72,20 @@ searchRadixTree = flip $ \ tree ->
             let prefix = matchBits bits key
             let overflow = length prefix `drop` bits
             -- Update the accumulators.
+            let branches' = branch:branches
             let roots' = _radixRoot:roots
             let prefixes' = prefix:prefixes
             let key' = length prefix `drop` key
             -- Check the termination criteria.
             if not (null overflow) || null key'
-            then pure (branch, roots', prefixes', overflow, key')
+            then pure (branches', roots', prefixes', overflow, key')
             else case bool _radixLeft _radixRight $ head key' of
-               Nothing -> pure (branch, roots', prefixes', overflow, key')
+               Nothing -> pure (branches', roots', prefixes', overflow, key')
                Just root -> do
                   -- Recurse.
                   let tree' = RadixTree _radixCache _radixDatabase root
                   let implicit' = Just $ head key'
-                  go tree' implicit' roots' prefixes' key'
+                  go tree' implicit' branches' roots' prefixes' key'
 
 -- |
 -- Lookup a value in the radix tree.
@@ -94,7 +95,7 @@ lookupRadixTree
    -> RadixTree -- ^ Radix tree.
    -> m (Maybe ByteString)
 lookupRadixTree key tree = do
-   (RadixBranch {..}, _, _, prefixOverflow, keyOverflow) <- searchRadixTree key tree
+   (RadixBranch {..}:_, _, _, prefixOverflow, keyOverflow) <- searchRadixTree key tree
    pure $ bool Nothing _radixLeaf $ null prefixOverflow && null keyOverflow
 
 -- |
@@ -150,7 +151,7 @@ insertRadixTree key value tree@RadixTree {..} =
       (cache, root) <- store _radixCache _radixDatabase branch
       pure $ RadixTree cache _radixDatabase root
    else do
-      (RadixBranch {..}, roots, prefixes, prefixOverflow, keyOverflow) <- searchRadixTree key tree
+      (RadixBranch {..}:_, roots, prefixes, prefixOverflow, keyOverflow) <- searchRadixTree key tree
       let path = tail roots `zip` map head prefixes
       if null prefixOverflow
       then if null keyOverflow
