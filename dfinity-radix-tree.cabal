@@ -23,6 +23,7 @@ library
       leveldb-haskell,
       lrucaching,
       resourcet,
+      semigroups,
       serialise
    default-language:
       Haskell2010

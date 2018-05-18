@@ -18,6 +18,7 @@ import Data.Bool (bool)
 import Data.ByteString.Char8 as Byte (ByteString, take)
 import Data.ByteString.Lazy.Char8 (toStrict)
 import Data.Default.Class (def)
+import Data.List.NonEmpty (NonEmpty(..), fromList)
 import Data.LruCache (empty)
 import Database.LevelDB as Level (DB, Options(..), open)
 import Lens.Simple (set)
@@ -57,7 +58,7 @@ searchRadixTree
    :: MonadIO m
    => ByteString -- ^ Key.
    -> RadixTree -- ^ Radix tree.
-   -> m ([RadixBranch], [ByteString], [[Bool]], [Bool], [Bool])
+   -> m (NonEmpty RadixBranch, NonEmpty ByteString, NonEmpty [Bool], [Bool], [Bool])
 searchRadixTree = flip $ \ tree ->
    go tree Nothing [] [] [] . toBits
    where
@@ -78,9 +79,9 @@ searchRadixTree = flip $ \ tree ->
             let key' = length prefix `drop` key
             -- Check the termination criteria.
             if not (null overflow) || null key'
-            then pure (branches', roots', prefixes', overflow, key')
+            then pure (fromList branches', fromList roots', fromList prefixes', overflow, key')
             else case bool _radixLeft _radixRight $ head key' of
-               Nothing -> pure (branches', roots', prefixes', overflow, key')
+               Nothing -> pure (fromList branches', fromList roots', fromList prefixes', overflow, key')
                Just root -> do
                   -- Recurse.
                   let tree' = RadixTree _radixCache _radixDatabase root
@@ -95,7 +96,7 @@ lookupRadixTree
    -> RadixTree -- ^ Radix tree.
    -> m (Maybe ByteString)
 lookupRadixTree key tree = do
-   (RadixBranch {..}:_, _, _, prefixOverflow, keyOverflow) <- searchRadixTree key tree
+   (RadixBranch {..} :| _, _, _, prefixOverflow, keyOverflow) <- searchRadixTree key tree
    pure $ bool Nothing _radixLeaf $ null prefixOverflow && null keyOverflow
 
 -- |
@@ -151,58 +152,52 @@ insertRadixTree key value tree@RadixTree {..} =
       (cache, root) <- store _radixCache _radixDatabase branch
       pure $ RadixTree cache _radixDatabase root
    else do
-      (RadixBranch {..}:_, roots, prefixes, prefixOverflow, keyOverflow) <- searchRadixTree key tree
-      let path = tail roots `zip` map head prefixes
+      (RadixBranch {..} :| _, root :| roots, prefix :| prefixes, prefixOverflow, keyOverflow) <- searchRadixTree key tree
+      free _radixDatabase root
+      let path = zip roots $ map head $ prefix : prefixes
       if null prefixOverflow
       then if null keyOverflow
          then do
             -- Update case.
-            free _radixDatabase $ head roots
-            let branch = RadixBranch _radixPrefix _radixLeft _radixRight $ Just value
-            (cache, root) <- store _radixCache _radixDatabase branch
-            merkleize cache _radixDatabase root path
-         else do
-            -- Key overflow case.
-            let prefix = toPrefix $ drop 1 keyOverflow
-            let branch = RadixBranch prefix Nothing Nothing $ Just value
-            (cache, root) <- Just <$$> store _radixCache _radixDatabase branch
-            free _radixDatabase $ head roots
-            let branch' = if head keyOverflow
-                  then RadixBranch _radixPrefix _radixLeft root _radixLeaf
-                  else RadixBranch _radixPrefix root _radixRight _radixLeaf
-            (cache', root') <- store cache _radixDatabase branch'
+            let branch' = RadixBranch _radixPrefix _radixLeft _radixRight $ Just value
+            (cache', root') <- store _radixCache _radixDatabase branch'
             merkleize cache' _radixDatabase root' path
+       else do
+            -- Key overflow case.
+            let prefix' = toPrefix $ drop 1 keyOverflow
+            let branch' = RadixBranch prefix' Nothing Nothing $ Just value
+            (cache', root') <- Just <$$> store _radixCache _radixDatabase branch'
+            let branch'' = if head keyOverflow
+                  then RadixBranch _radixPrefix _radixLeft root' _radixLeaf
+                  else RadixBranch _radixPrefix root' _radixRight _radixLeaf
+            (cache'', root'') <- store cache' _radixDatabase branch''
+            merkleize cache'' _radixDatabase root'' path
       else if null keyOverflow
          then do
             -- Prefix overflow case.
-            free _radixDatabase $ head roots
-            let prefix = toPrefix $ drop 1 prefixOverflow
-            let branch = RadixBranch prefix _radixLeft _radixRight _radixLeaf
-            (cache, root) <- Just <$$> store _radixCache _radixDatabase branch
-            let prefix' = toPrefix $ if head roots == _radixRoot
-                  then head prefixes
-                  else drop 1 $ head prefixes
-            let branch' = if head prefixOverflow
-                  then RadixBranch prefix' Nothing root $ Just value
-                  else RadixBranch prefix' root Nothing $ Just value
-            (cache', root') <- store cache _radixDatabase branch'
-            merkleize cache' _radixDatabase root' path
-         else do
-            -- General case.
-            let prefix = toPrefix $ drop 1 keyOverflow
-            let branch = RadixBranch prefix Nothing Nothing $ Just value
-            (cache, root) <- Just <$$> store _radixCache _radixDatabase branch
             let prefix' = toPrefix $ drop 1 prefixOverflow
             let branch' = RadixBranch prefix' _radixLeft _radixRight _radixLeaf
-            (cache', root') <- Just <$$> store cache _radixDatabase branch'
-            let prefix'' = toPrefix $ if head roots == _radixRoot
-                  then head prefixes
-                  else drop 1 $ head prefixes
-            let branch'' = if head keyOverflow
-                  then RadixBranch prefix'' root' root Nothing
-                  else RadixBranch prefix'' root root' Nothing
+            (cache', root') <- Just <$$> store _radixCache _radixDatabase branch'
+            let prefix'' = toPrefix $ drop 1 prefix `bool` prefix $ root == _radixRoot
+            let branch'' = if head prefixOverflow
+                  then RadixBranch prefix'' Nothing root' $ Just value
+                  else RadixBranch prefix'' root' Nothing $ Just value
             (cache'', root'') <- store cache' _radixDatabase branch''
             merkleize cache'' _radixDatabase root'' path
+         else do
+            -- General case.
+            let prefix' = toPrefix $ drop 1 keyOverflow
+            let branch' = RadixBranch prefix' Nothing Nothing $ Just value
+            (cache', root') <- Just <$$> store _radixCache _radixDatabase branch'
+            let prefix'' = toPrefix $ drop 1 prefixOverflow
+            let branch'' = RadixBranch prefix'' _radixLeft _radixRight _radixLeaf
+            (cache'', root'') <- Just <$$> store cache' _radixDatabase branch''
+            let prefix''' = toPrefix $ drop 1 prefix `bool` prefix $ root == _radixRoot
+            let branch''' = if head keyOverflow
+                  then RadixBranch prefix''' root'' root' Nothing
+                  else RadixBranch prefix''' root' root'' Nothing
+            (cache''', root''') <- store cache'' _radixDatabase branch'''
+            merkleize cache''' _radixDatabase root''' path
    where
    toPrefix :: [Bool] -> Maybe RadixPrefix
    toPrefix bits =
