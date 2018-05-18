@@ -178,7 +178,9 @@ insertRadixTree key value tree@RadixTree {..} =
             let prefix = toPrefix $ drop 1 prefixOverflow
             let branch = RadixBranch prefix _radixLeft _radixRight _radixLeaf
             (cache, root) <- Just <$$> store _radixCache _radixDatabase branch
-            let prefix' = toPrefix $ drop 1 $ head prefixes
+            let prefix' = toPrefix $ if head roots == _radixRoot
+                  then head prefixes
+                  else drop 1 $ head prefixes
             let branch' = if head prefixOverflow
                   then RadixBranch prefix' Nothing root $ Just value
                   else RadixBranch prefix' root Nothing $ Just value
@@ -192,7 +194,9 @@ insertRadixTree key value tree@RadixTree {..} =
             let prefix' = toPrefix $ drop 1 prefixOverflow
             let branch' = RadixBranch prefix' _radixLeft _radixRight _radixLeaf
             (cache', root') <- Just <$$> store cache _radixDatabase branch'
-            let prefix'' = toPrefix $ drop 1 $ head prefixes
+            let prefix'' = toPrefix $ if head roots == _radixRoot
+                  then head prefixes
+                  else drop 1 $ head prefixes
             let branch'' = if head keyOverflow
                   then RadixBranch prefix'' root' root Nothing
                   else RadixBranch prefix'' root root' Nothing
