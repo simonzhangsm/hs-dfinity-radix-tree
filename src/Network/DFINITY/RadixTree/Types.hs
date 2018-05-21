@@ -1,9 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
+{-# OPTIONS -Wall #-}
+
 module Network.DFINITY.RadixTree.Types
    ( RadixBranch(..)
+   , RadixBuffer
    , RadixCache
+   , RadixDatabase
    , RadixPrefix(..)
    , RadixTree(..)
    ) where
@@ -18,10 +22,11 @@ import Data.Bool (bool)
 import Data.ByteString.Base16 as Base16 (encode)
 import Data.ByteString.Char8 (ByteString, unpack)
 import Data.ByteString.Lazy (toStrict)
-import Data.ByteString.Short (ShortByteString)
+import Data.ByteString.Short (ShortByteString, fromShort)
 import Data.Data (Data)
 import Data.Default.Class (Default(..))
 import Data.LruCache (LruCache)
+import Data.Map.Strict (Map, toList)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
 import Database.LevelDB (DB)
@@ -113,11 +118,17 @@ instance Show RadixBranch where
       left = color 4 $ maybe "null" format _radixLeft
       right = color 4 $ maybe "null" format _radixRight
 
+type RadixBuffer = Map ShortByteString ByteString
+
 type RadixCache = LruCache ShortByteString ByteString
+
+type RadixDatabase = DB
 
 data RadixTree
    = RadixTree
-   { _radixCache :: RadixCache
-   , _radixDatabase :: DB
+   { _radixBuffer :: RadixBuffer
+   , _radixCache :: RadixCache
+   , _radixCheckpoint :: ByteString
+   , _radixDatabase :: RadixDatabase
    , _radixRoot :: ByteString
    }
