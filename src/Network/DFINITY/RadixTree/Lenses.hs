@@ -1,5 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS -Wall #-}
+{-# OPTIONS -fno-warn-missing-signatures #-}
+
 module Network.DFINITY.RadixTree.Lenses
    ( radixBitLen
    , radixName

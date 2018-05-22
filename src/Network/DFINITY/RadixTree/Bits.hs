@@ -1,3 +1,5 @@
+{-# OPTIONS -Wall #-}
+
 module Network.DFINITY.RadixTree.Bits
    ( Bitable(..)
    , matchBits

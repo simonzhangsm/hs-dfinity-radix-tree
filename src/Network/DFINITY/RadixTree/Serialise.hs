@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS -Wall #-}
+
 module Network.DFINITY.RadixTree.Serialise
    ( decodeLeaf
    , decodeMaybe
