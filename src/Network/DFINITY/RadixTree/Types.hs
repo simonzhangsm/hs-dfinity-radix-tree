@@ -22,7 +22,7 @@ import Data.Bool (bool)
 import Data.ByteString.Base16 as Base16 (encode)
 import Data.ByteString.Char8 (ByteString, unpack)
 import Data.ByteString.Lazy (toStrict)
-import Data.ByteString.Short (ShortByteString)
+import Data.ByteString.Short (ShortByteString, fromShort, toShort)
 import Data.Data (Data)
 import Data.Default.Class (Default(..))
 import Data.LruCache (LruCache)
@@ -72,8 +72,8 @@ instance Show RadixPrefix where
 data RadixBranch
    = RadixBranch
    { _radixPrefix :: Maybe RadixPrefix
-   , _radixLeft :: Maybe ByteString
-   , _radixRight :: Maybe ByteString
+   , _radixLeft :: Maybe ShortByteString
+   , _radixRight :: Maybe ShortByteString
    , _radixLeaf :: Maybe ByteString
    } deriving (Data, Eq)
 
@@ -92,15 +92,18 @@ instance Serialise RadixBranch where
    encode RadixBranch {..} =
       encodeListLen len <>
       encodeMaybe CBOR.encode _radixPrefix <>
-      encodeMaybe encodeSide _radixLeft <>
-      encodeMaybe encodeSide _radixRight <>
+      encodeMaybe encodeSide left <>
+      encodeMaybe encodeSide right <>
       maybe mempty encodeBytes _radixLeaf
-      where len = bool 3 4 $ isJust _radixLeaf
+      where 
+      len = bool 3 4 $ isJust _radixLeaf
+      left = fromShort <$> _radixLeft
+      right = fromShort <$> _radixRight
    decode = do
       len <- decodeListLen
       prefix <- decodeMaybe decode
-      left <- decodeMaybe decodeSide
-      right <- decodeMaybe decodeSide
+      left <- decodeMaybe $ toShort <$> decodeSide
+      right <- decodeMaybe $ toShort <$> decodeSide
       leaf <- decodeLeaf len
       pure $ RadixBranch prefix left right leaf
 
@@ -115,10 +118,10 @@ instance Show RadixBranch where
       format = take 8 . unpack . Base16.encode
       root = color 4 $ format $ hash $ toStrict $ serialise branch
       prefix = color 7 $ maybe "null" show _radixPrefix
-      left = color 4 $ maybe "null" format _radixLeft
-      right = color 4 $ maybe "null" format _radixRight
+      left = color 4 $ maybe "null" format $ fromShort <$> _radixLeft
+      right = color 4 $ maybe "null" format $ fromShort <$> _radixRight
 
-type RadixBuffer = Map ShortByteString ByteString
+type RadixBuffer = Map ShortByteString (RadixBranch, [ShortByteString])
 
 type RadixCache = LruCache ShortByteString ByteString
 
@@ -128,7 +131,7 @@ data RadixTree
    = RadixTree
    { _radixBuffer :: RadixBuffer
    , _radixCache :: RadixCache
-   , _radixCheckpoint :: ByteString
+   , _radixCheckpoint :: ShortByteString
    , _radixDatabase :: RadixDatabase
-   , _radixRoot :: ByteString
+   , _radixRoot :: ShortByteString
    }
