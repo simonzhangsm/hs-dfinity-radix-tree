@@ -7,6 +7,7 @@ module Network.DFINITY.RadixTree.Lenses
    , radixLeft
    , radixRight
    , radixLeaf
+   , radixBuffer
    , radixCache
    , radixCheckpoint
    , radixDatabase
