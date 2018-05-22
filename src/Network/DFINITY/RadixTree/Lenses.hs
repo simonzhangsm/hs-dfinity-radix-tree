@@ -8,6 +8,7 @@ module Network.DFINITY.RadixTree.Lenses
    , radixRight
    , radixLeaf
    , radixCache
+   , radixCheckpoint
    , radixDatabase
    , radixRoot
    ) where
