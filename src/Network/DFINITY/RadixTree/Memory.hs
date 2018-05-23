@@ -57,7 +57,7 @@ loadCold root cache database =
 -- Store a branch in memory.
 storeHot
    :: RadixBranch -- ^ Branch.
-   -> [ShortByteString] -- ^ Parents.
+   -> [(ShortByteString, Bool)] -- ^ Path.
    -> RadixBuffer -- ^ Buffer.
    -> (ShortByteString, RadixBuffer)
 storeHot branch parents buffer =

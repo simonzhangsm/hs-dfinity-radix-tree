@@ -9,6 +9,7 @@ module Network.DFINITY.RadixTree.Types
    , RadixCache
    , RadixDatabase
    , RadixPrefix(..)
+   , RadixSearchResult
    , RadixTree(..)
    ) where
 
@@ -25,6 +26,7 @@ import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Short (ShortByteString, fromShort, toShort)
 import Data.Data (Data)
 import Data.Default.Class (Default(..))
+import Data.List.NonEmpty (NonEmpty)
 import Data.LruCache (LruCache)
 import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
@@ -121,11 +123,13 @@ instance Show RadixBranch where
       left = color 4 $ maybe "null" format $ fromShort <$> _radixLeft
       right = color 4 $ maybe "null" format $ fromShort <$> _radixRight
 
-type RadixBuffer = Map ShortByteString (ByteString, [ShortByteString])
+type RadixBuffer = Map ShortByteString (ByteString, [(ShortByteString, Bool)])
 
 type RadixCache = LruCache ShortByteString ByteString
 
 type RadixDatabase = DB
+
+type RadixSearchResult = (NonEmpty ShortByteString, NonEmpty RadixBranch, NonEmpty [Bool], [Bool], [Bool], RadixCache)
 
 data RadixTree
    = RadixTree
