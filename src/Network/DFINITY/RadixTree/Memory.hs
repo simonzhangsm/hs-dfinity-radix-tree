@@ -10,9 +10,9 @@ module Network.DFINITY.RadixTree.Memory
 import Codec.Serialise (deserialise, serialise)
 import Control.Monad.IO.Class (MonadIO)
 import Crypto.Hash.SHA256 (hash)
-import Data.ByteString.Char8 as Byte (ByteString, take)
+import Data.ByteString.Char8 as Byte (take)
 import Data.ByteString.Lazy (fromStrict, toStrict)
-import Data.ByteString.Short (ShortByteString, toShort)
+import Data.ByteString.Short (ShortByteString, fromShort, toShort)
 import Data.LruCache as LRU (insert, lookup)
 import Data.Map.Strict as Map (insert, lookup)
 import Database.LevelDB (defaultReadOptions, defaultWriteOptions, get, put)
@@ -22,76 +22,64 @@ import Network.DFINITY.RadixTree.Types
 -- |
 -- Load a branch from memory.
 loadHot
-   :: RadixBuffer -- ^ Buffer.
-   -> ByteString -- ^ State root.
-   -> (Maybe RadixBranch)
-loadHot buffer root =
-   case Map.lookup short buffer of
-      Just bytes -> do
-         let branch = deserialise $ fromStrict bytes
-         seq branch $ Just branch
-      Nothing -> Nothing
-   where
-   short = toShort root
+   :: ShortByteString -- ^ State root.
+   -> RadixBuffer -- ^ Buffer.
+   -> Maybe RadixBranch
+loadHot root buffer = do
+   bytes <- fst <$> Map.lookup root buffer
+   let branch = deserialise $ fromStrict bytes
+   seq branch $ pure branch
 
 -- |
 -- Load a branch from persistent memory.
 loadCold
    :: MonadIO m
-   => RadixCache -- ^ Cache.
+   => ShortByteString -- ^ State root.
+   -> RadixCache -- ^ Cache.
    -> RadixDatabase -- ^ Database.
-   -> ByteString -- ^ State root.
    -> m (Maybe (RadixBranch, RadixCache))
-loadCold cache database root =
-   case LRU.lookup short cache of
+loadCold root cache database =
+   case LRU.lookup root cache of
       Just (bytes, cache') -> do
          let branch = deserialise $ fromStrict bytes
          seq branch $ pure $ Just (branch, cache')
       Nothing -> do
-         result <- get database defaultReadOptions root
+         let key = fromShort root
+         result <- get database defaultReadOptions key
          case result of
             Just bytes -> do
                let branch = deserialise $ fromStrict bytes
-               let cache' = LRU.insert short bytes cache
+               let cache' = LRU.insert root bytes cache
                seq cache' $ seq branch $ pure $ Just (branch, cache')
             Nothing -> pure $ Nothing
-   where
-   short = toShort root
 
 -- |
 -- Store a branch in memory.
 storeHot
-   :: RadixBuffer -- ^ Buffer.
-   -> RadixBranch -- ^ Branch.
-   -> (ByteString, RadixBuffer)
-storeHot buffer branch =
+   :: RadixBranch -- ^ Branch.
+   -> [ShortByteString] -- ^ Parents.
+   -> RadixBuffer -- ^ Buffer.
+   -> (ShortByteString, RadixBuffer)
+storeHot branch parents buffer =
    seq buffer' (root, buffer')
    where
-   (bytes, root, short) = unload branch
-   buffer' = Map.insert short bytes buffer
+   bytes = toStrict $ serialise branch
+   root = toShort $ Byte.take 20 $ hash bytes
+   buffer' = Map.insert root (bytes, parents) buffer
 
 -- |
 -- Store a branch in persistent memory.
 storeCold
    :: MonadIO m
-   => RadixCache -- ^ Cache.
+   => RadixBranch -- ^ Branch.
+   -> RadixCache -- ^ Cache.
    -> RadixDatabase -- ^ Database.
-   -> RadixBranch -- ^ Branch.
-   -> m (ByteString, RadixCache)
-storeCold cache database branch = do
-   put database defaultWriteOptions root bytes
+   -> m (ShortByteString, RadixCache)
+storeCold branch cache database = do
+   put database defaultWriteOptions key bytes
    seq cache' $ pure (root, cache')
    where
-   (bytes, root, short) = unload branch
-   cache' = LRU.insert short bytes cache
-
--- |
--- Unload a branch.
-unload
-   :: RadixBranch -- ^ Branch.
-   -> (ByteString, ByteString, ShortByteString)
-unload branch = (bytes, root, short)
-   where
    bytes = toStrict $ serialise branch
-   root = Byte.take 20 $ hash bytes
-   short = toShort root
+   key = Byte.take 20 $ hash bytes
+   root = toShort key
+   cache' = LRU.insert root bytes cache
