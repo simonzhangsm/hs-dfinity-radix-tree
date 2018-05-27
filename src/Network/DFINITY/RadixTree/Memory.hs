@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 {-# OPTIONS -Wall #-}
 
 module Network.DFINITY.RadixTree.Memory
@@ -5,6 +7,7 @@ module Network.DFINITY.RadixTree.Memory
    , loadCold
    , storeHot
    , storeCold
+   , freeHot
    ) where
 
 import Codec.Serialise (deserialise, serialise)
@@ -12,9 +15,9 @@ import Control.Monad.IO.Class (MonadIO)
 import Crypto.Hash.SHA256 (hash)
 import Data.ByteString.Char8 as Byte (take)
 import Data.ByteString.Lazy (fromStrict, toStrict)
-import Data.ByteString.Short (ShortByteString, fromShort, toShort)
+import Data.ByteString.Short (fromShort, toShort)
 import Data.LruCache as LRU (insert, lookup)
-import Data.Map.Strict as Map (insert, lookup)
+import Data.Map.Strict as Map (delete, insert, lookup)
 import Database.LevelDB (defaultReadOptions, defaultWriteOptions, get, put)
 
 import Network.DFINITY.RadixTree.Types
@@ -22,19 +25,16 @@ import Network.DFINITY.RadixTree.Types
 -- |
 -- Load a branch from memory.
 loadHot
-   :: ShortByteString -- ^ State root.
+   :: RadixRoot -- ^ State root.
    -> RadixBuffer -- ^ Buffer.
    -> Maybe RadixBranch
-loadHot root buffer = do
-   bytes <- fst <$> Map.lookup root buffer
-   let branch = deserialise $ fromStrict bytes
-   seq branch $ pure branch
+loadHot = Map.lookup
 
 -- |
 -- Load a branch from persistent memory.
 loadCold
    :: MonadIO m
-   => ShortByteString -- ^ State root.
+   => RadixRoot -- ^ State root.
    -> RadixCache -- ^ Cache.
    -> RadixDatabase -- ^ Database.
    -> m (Maybe (RadixBranch, RadixCache))
@@ -56,16 +56,11 @@ loadCold root cache database =
 -- |
 -- Store a branch in memory.
 storeHot
-   :: RadixBranch -- ^ Branch.
-   -> [(ShortByteString, Bool)] -- ^ Path.
+   :: RadixRoot -- ^ State root.
+   -> RadixBranch -- ^ Branch.
    -> RadixBuffer -- ^ Buffer.
-   -> (ShortByteString, RadixBuffer)
-storeHot branch parents buffer =
-   seq buffer' (root, buffer')
-   where
-   bytes = toStrict $ serialise branch
-   root = toShort $ Byte.take 20 $ hash bytes
-   buffer' = Map.insert root (bytes, parents) buffer
+   -> RadixBuffer
+storeHot = Map.insert
 
 -- |
 -- Store a branch in persistent memory.
@@ -74,7 +69,7 @@ storeCold
    => RadixBranch -- ^ Branch.
    -> RadixCache -- ^ Cache.
    -> RadixDatabase -- ^ Database.
-   -> m (ShortByteString, RadixCache)
+   -> m (RadixRoot, RadixCache)
 storeCold branch cache database = do
    put database defaultWriteOptions key bytes
    seq cache' $ pure (root, cache')
@@ -83,3 +78,11 @@ storeCold branch cache database = do
    key = Byte.take 20 $ hash bytes
    root = toShort key
    cache' = LRU.insert root bytes cache
+
+-- |
+-- Free a branch in memory.
+freeHot
+   :: RadixRoot -- ^ State root.
+   -> RadixBuffer -- ^ Buffer.
+   -> RadixBuffer
+freeHot = Map.delete
