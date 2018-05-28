@@ -9,7 +9,7 @@ module Network.DFINITY.RadixTree
    , createRadixTree
    , isEmptyRadixTree
    , insertRadixTree
--- , deleteRadixTree
+   , deleteRadixTree
    , merkleizeRadixTree
    , lookupMerkleizedRadixTree
    , lookupNonMerkleizedRadixTree
@@ -29,9 +29,9 @@ import Data.Default.Class (def)
 import Data.List.NonEmpty (NonEmpty(..), fromList)
 import Data.LruCache as LRU (empty)
 import Data.Map.Strict as Map (empty)
-import Data.Maybe (fromJust, isNothing, listToMaybe)
+import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
 import Database.LevelDB (Options(..), open)
-import Lens.Simple (set)
+import Lens.Simple (set, view)
 
 import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Bloom
@@ -272,6 +272,103 @@ insertRadixTreeBetween (root :| roots, branch :| branches, prefix :| _, prefixOv
    bloom = flip insertList _radixBloom $ root''':root'':root':roots
    buffer = merkleSpoof root''' parent $ storeHot root''' branch''' $ storeHot root'' branch'' $ storeHot root' branch' $ freeHot root _radixBuffer
    state = bool _radixRoot root''' $ null roots
+
+-- |
+-- Delete a value from a radix tree.
+deleteRadixTree
+   :: MonadIO m
+   => ByteString -- ^ Key.
+   -> RadixTree -- ^ Radix tree.
+   -> m RadixTree
+deleteRadixTree key tree@RadixTree {..} =
+   if isEmptyRadixTree tree
+   then pure tree
+   else do
+      result <- searchNonMerkleizedRadixTree key tree
+      case result of
+         Nothing -> fail "deleteRadixTree: state root does not exist"
+         Just (root :| roots, branch :| branches, prefix :| prefixes, prefixOverflow, keyOverflow, cache) ->
+            if not $ null prefixOverflow && null keyOverflow
+            then pure tree
+            else case view radixLeft branch of
+               Nothing -> case view radixRight branch of
+                  Nothing -> case zip3 roots branches $ map head $ prefix:prefixes of
+                     [] -> do
+                        let bloom = insert defaultRoot _radixBloom
+                        let buffer = storeHot defaultRoot def $ freeHot root _radixBuffer
+                        pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase defaultRoot
+                     (parentRoot, parentBranch, parentTest):ancestors -> do
+                        if isJust $ view radixLeaf parentBranch
+                        then do
+                           let branch' = set (bool radixLeft radixRight parentTest) Nothing parentBranch
+                           let root' = createRoot branch'
+                           let grandparent = listToMaybe ancestors
+                           let bloom = insertList (root':drop 1 roots) _radixBloom
+                           let buffer = merkleSpoof root' grandparent $ storeHot root' branch' $ freeHot root _radixBuffer
+                           let state = bool _radixRoot root' $ null ancestors
+                           pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
+                        else case view (bool radixLeft radixRight $ not $ head prefix) parentBranch of
+                           Nothing -> fail "deleteRadixTree: impossible"
+                           Just sibRoot -> do
+                              sibResult <- 
+                                 case loadHot sibRoot _radixBuffer of
+                                    Nothing -> loadCold sibRoot cache _radixDatabase
+                                    Just sibBranch -> pure $ Just (sibBranch, cache)
+                              case sibResult of
+                                 Nothing -> fail "deleteRadixTree: sibling state root does not exist"
+                                 Just (sibBranch, cache') -> do
+                                    let bits' = head prefixes ++ (not $ head prefix) : (maybe [] toBits $ view radixPrefix sibBranch)
+                                    let prefix' = createPrefix $ drop 1 bits' `bool` bits' $ null ancestors
+                                    let branch' = set radixPrefix prefix' sibBranch
+                                    let root' = createRoot branch'
+                                    let grandparent = listToMaybe ancestors
+                                    let bloom = insertList (root':drop 1 roots) _radixBloom
+                                    let buffer = merkleSpoof root' grandparent $ storeHot root' branch' $ freeHot parentRoot $ freeHot root _radixBuffer
+                                    let state = bool _radixRoot root' $ null ancestors
+                                    pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+                  Just right -> do
+                     childResult <- 
+                        case loadHot right _radixBuffer of
+                           Nothing -> loadCold right cache _radixDatabase
+                           Just childBranch -> pure $ Just (childBranch, cache)
+                     case childResult of
+                        Nothing -> fail "deleteRadixTree: child state root does not exist"
+                        Just (childBranch, cache') -> do
+                           let bits' = prefix ++ True : (maybe [] toBits $ view radixPrefix childBranch)
+                           let prefix' = createPrefix $ drop 1 bits' `bool` bits' $ null roots
+                           let branch' = set radixPrefix prefix' childBranch
+                           let root' = createRoot branch'
+                           let parent = listToMaybe $ zip3 roots branches [head prefix]
+                           let bloom = insertList (root':roots) _radixBloom
+                           let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
+                           let state = bool _radixRoot root' $ null roots
+                           pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+               Just left -> case view radixRight branch of
+                  Nothing -> do
+                     childResult <- 
+                        case loadHot left _radixBuffer of
+                           Nothing -> loadCold left cache _radixDatabase
+                           Just childBranch -> pure $ Just (childBranch, cache)
+                     case childResult of
+                        Nothing -> fail "deleteRadixTree: child state root does not exist"
+                        Just (childBranch, cache') -> do
+                           let bits' = prefix ++ False : (maybe [] toBits $ view radixPrefix childBranch)
+                           let prefix' = createPrefix $ drop 1 bits' `bool` bits' $ null roots
+                           let branch' = set radixPrefix prefix' childBranch
+                           let root' = createRoot branch'
+                           let parent = listToMaybe $ zip3 roots branches [head prefix]
+                           let bloom = insertList (root':roots) _radixBloom
+                           let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
+                           let state = bool _radixRoot root' $ null roots
+                           pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+                  Just _ -> do
+                     let branch' = set radixLeaf Nothing branch
+                     let root' = createRoot branch'
+                     let parent = listToMaybe $ zip3 roots branches [head prefix]
+                     let bloom = insertList (root':roots) _radixBloom
+                     let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
+                     let state = bool _radixRoot root' $ null roots
+                     pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
 
 -- |
 -- Lookup a value in a radix tree.
