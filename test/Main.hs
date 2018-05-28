@@ -17,7 +17,7 @@ import Data.ByteString.Char8 (ByteString, unpack)
 import Data.ByteString.Lazy.Char8 as Lazy (readFile)
 import Data.ByteString.Short (fromShort)
 import Data.Default.Class (Default(..))
-import Data.HashMap.Strict as Map (lookup)
+import Data.HashMap.Strict as Map (elems, lookup)
 import Data.Text as Text (Text, drop)
 import Data.Text.Encoding (encodeUtf8)
 import System.Console.CmdArgs (Data, cmdArgs)
@@ -112,9 +112,10 @@ main = do
    contents <- Lazy.readFile file
    case eitherDecode contents of
       Left err -> fail err
-      Right vctors ->
-         case Map.lookup test vctors of
+      Right vctors -> runResourceT $ do
+         tree <- createRadixTree 100 100 database Nothing
+         if test == "*"
+         then foldM_ step tree `mapM_` elems vctors
+         else case Map.lookup test vctors of
             Nothing -> fail $ "unknown test vector: " ++ test
-            Just ops -> runResourceT $ do
-               tree <- createRadixTree 100 100 database Nothing
-               foldM_ step tree $ concat [ops]
+            Just ops -> foldM_ step tree $ concat [ops]
