@@ -1,2 +1,6 @@
+*.hp
+*.ps
+*.svg
 dist*
+benchmark/benchmarkdb*
 test/testdb*

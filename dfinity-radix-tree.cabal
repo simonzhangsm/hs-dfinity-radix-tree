@@ -64,7 +64,30 @@ executable dfinity-radix-tree-unit-tests
       Haskell2010
    ghc-options:
       -O2
+      -Wall
+      -threaded
    hs-source-dirs:
       test
+   main-is:
+      Main.hs
+
+executable dfinity-radix-tree-benchmarks
+   build-depends:
+      base,
+      bytestring,
+      cmdargs,
+      cryptohash-sha256,
+      data-default-class,
+      dfinity-radix-tree,
+      resourcet
+   default-language:
+      Haskell2010
+   ghc-options:
+      -O2
+      -Wall
+      -rtsopts
+      -threaded
+   hs-source-dirs:
+      benchmark
    main-is:
       Main.hs
