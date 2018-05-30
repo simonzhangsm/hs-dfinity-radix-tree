@@ -65,7 +65,6 @@ executable dfinity-radix-tree-unit-tests
    ghc-options:
       -O2
       -Wall
-      -threaded
    hs-source-dirs:
       test
    main-is:
@@ -86,7 +85,6 @@ executable dfinity-radix-tree-benchmarks
       -O2
       -Wall
       -rtsopts
-      -threaded
    hs-source-dirs:
       benchmark
    main-is:
