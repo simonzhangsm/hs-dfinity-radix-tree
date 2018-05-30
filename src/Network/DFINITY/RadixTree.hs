@@ -18,7 +18,6 @@ module Network.DFINITY.RadixTree
    ) where
 
 import Control.Arrow ((***))
-import Control.Concurrent.Async (async, waitBoth)
 import Control.Monad (forM_)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Resource (MonadResource)
@@ -457,9 +456,8 @@ merkleizeRadixTree RadixTree {..} = do
                            let branch' = RadixBranch _radixPrefix (Just root') Nothing _radixLeaf
                            storeCold branch' cache'' _radixDatabase
                         Just right -> do
-                           asyncLeft <- async $ loop left cache'
-                           asyncRight <- async $ loop right cache'
-                           ((root', _), (root'', cache''')) <- liftIO $ waitBoth asyncLeft asyncRight
+                           (root', cache'') <- loop left cache'
+                           (root'', cache''') <- loop right cache''
                            let branch' = RadixBranch _radixPrefix (Just root') (Just root'') _radixLeaf
                            storeCold branch' cache''' _radixDatabase
       where
