@@ -40,16 +40,15 @@ loadCold
    -> m (Maybe (RadixBranch, RadixCache))
 loadCold root cache database =
    case LRU.lookup root cache of
-      Just (bytes, cache') -> do
-         let branch = deserialise $ fromStrict bytes
-         seq branch $ pure $ Just (branch, cache')
+      Just (branch, cache') ->
+         seq cache' $ seq branch $ pure $ Just (branch, cache')
       Nothing -> do
          let key = fromShort root
          result <- get database defaultReadOptions key
          case result of
             Just bytes -> do
                let branch = deserialise $ fromStrict bytes
-               let cache' = LRU.insert root bytes cache
+               let cache' = LRU.insert root branch cache
                seq cache' $ seq branch $ pure $ Just (branch, cache')
             Nothing -> pure $ Nothing
 
@@ -77,7 +76,7 @@ storeCold branch cache database = do
    bytes = toStrict $ serialise branch
    key = Byte.take 20 $ hash bytes
    root = toShort key
-   cache' = LRU.insert root bytes cache
+   cache' = LRU.insert root branch cache
 
 -- |
 -- Free a branch in memory.

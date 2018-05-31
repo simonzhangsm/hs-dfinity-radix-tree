@@ -96,7 +96,7 @@ instance Show RadixBranch where
 
 type RadixBuffer = Map RadixRoot RadixBranch
 
-type RadixCache = LruCache RadixRoot ByteString
+type RadixCache = LruCache RadixRoot RadixBranch
 
 type RadixDatabase = DB
 
