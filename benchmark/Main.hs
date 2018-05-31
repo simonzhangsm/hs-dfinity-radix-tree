@@ -35,26 +35,26 @@ step action tree i =
    else action tree key
    where key = hash $ pack $ show i
 
-stepInsert
+foldInsert
    :: MonadIO m
    => RadixTree
-   -> Int
+   -> [Int]
    -> m RadixTree
-stepInsert = step $ flip $ \ key -> insertRadixTree key key
+foldInsert = foldM $ step $ flip $ \ key -> insertRadixTree key key
 
-stepDelete
+foldDelete
    :: MonadIO m
    => RadixTree
-   -> Int
+   -> [Int]
    -> m RadixTree
-stepDelete = step $ flip deleteRadixTree
+foldDelete = foldM $ step $ flip deleteRadixTree
 
 main :: IO ()
 main = do
    Args {..} <- cmdArgs def
    runResourceT $ do
       tree <- createRadixTree 65536 2048 database Nothing
-      tree' <- foldM stepInsert tree keys
-      tree'' <- foldM stepDelete tree' keys
+      tree' <- foldInsert tree keys
+      tree'' <- foldDelete tree' keys
       liftIO $ print $ isEmptyRadixTree tree''
       where keys = [1..100000]
