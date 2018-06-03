@@ -57,4 +57,4 @@ main = do
       tree' <- foldInsert tree keys
       tree'' <- foldDelete tree' keys
       liftIO $ print $ isEmptyRadixTree tree''
-      where keys = [1..100000]
+      where keys = [1..1000000]
