@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS -Wall #-}
@@ -9,6 +10,7 @@ module Network.DFINITY.RadixTree.Lenses
    , radixPrefix
    , radixLeft
    , radixRight
+   , radixChild
    , radixLeaf
    , radixBloom
    , radixBloomBits
@@ -19,10 +21,14 @@ module Network.DFINITY.RadixTree.Lenses
    , radixRoot
    ) where
 
-import Lens.Simple (makeLenses)
+import Data.Bool (bool)
+import Lens.Simple (Lens', makeLenses)
 
 import Network.DFINITY.RadixTree.Types
 
 makeLenses ''RadixPrefix
 makeLenses ''RadixBranch
 makeLenses ''RadixTree
+
+radixChild :: Bool -> Lens' RadixBranch (Maybe RadixRoot)
+radixChild = bool radixLeft radixRight
