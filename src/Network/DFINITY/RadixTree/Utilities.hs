@@ -7,7 +7,7 @@ module Network.DFINITY.RadixTree.Utilities
    ) where
 
 import Codec.Serialise (serialise)
-import Crypto.Hash.SHA256 (hash)
+import Crypto.Hash.SHA256 (hashlazy)
 import Data.ByteString.Char8 as Byte (take)
 import Data.ByteString.Lazy.Char8 (toStrict)
 import Data.ByteString.Short (toShort)
@@ -23,7 +23,7 @@ createPrefix bits =
    else Just $ fromBits bits
 
 createRoot :: RadixBranch -> RadixRoot
-createRoot = toShort . Byte.take 20 . hash . toStrict . serialise
+createRoot = toShort . Byte.take 20 . hashlazy . serialise
 
 defaultRoot :: RadixRoot
 defaultRoot = createRoot def
