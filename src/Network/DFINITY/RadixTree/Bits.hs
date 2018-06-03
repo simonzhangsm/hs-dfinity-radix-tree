@@ -24,7 +24,7 @@ matchBits :: [Bool] -> [Bool] -> [Bool]
 matchBits x = map fst . zipWhile (==) x
 
 zipWhile :: (a -> b -> Bool) -> [a] -> [b] -> [(a,b)]
-zipWhile f x y = takeWhile (uncurry f) $ zip x y
+zipWhile f x = takeWhile (uncurry f) . zip x
 
 fromByte :: Word8 -> [Bool]
 fromByte = flip map order . testBit
