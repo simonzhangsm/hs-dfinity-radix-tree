@@ -53,7 +53,7 @@ main :: IO ()
 main = do
    Args {..} <- cmdArgs def
    runResourceT $ do
-      tree <- createRadixTree 65536 2048 database Nothing
+      tree <- createRadixTree 1048576 6144 database Nothing
       tree' <- foldInsert tree keys
       tree'' <- foldDelete tree' keys
       liftIO $ print $ isEmptyRadixTree tree''
