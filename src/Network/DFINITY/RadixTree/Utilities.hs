@@ -9,7 +9,6 @@ module Network.DFINITY.RadixTree.Utilities
 import Codec.Serialise (serialise)
 import Crypto.Hash.SHA256 (hashlazy)
 import Data.ByteString.Char8 as Byte (take)
-import Data.ByteString.Lazy.Char8 (toStrict)
 import Data.ByteString.Short (toShort)
 import Data.Default.Class (def)
 
