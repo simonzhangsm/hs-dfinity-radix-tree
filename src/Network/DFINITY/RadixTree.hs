@@ -165,6 +165,7 @@ initializeRadixTree
    -> RadixTree -- ^ Radix tree.
    -> RadixTree
 initializeRadixTree key value tree@RadixTree {..} =
+   seq bloom $
    set radixBloom bloom $
    set radixBuffer buffer $
    set radixRoot root tree
@@ -183,6 +184,7 @@ updateRadixTree
    -> RadixTree -- ^ Radix tree.
    -> RadixTree
 updateRadixTree (root :| roots, branch :| branches, prefix :| _, _, _, cache) value tree@RadixTree {..} =
+   seq bloom $
    set radixBloom bloom $
    set radixBuffer buffer $
    set radixCache cache $
@@ -203,6 +205,7 @@ insertRadixTreeAfter
    -> RadixTree -- ^ Radix tree.
    -> RadixTree
 insertRadixTreeAfter (root :| roots, branch :| branches, prefix :| _, _, overflow, cache) value tree@RadixTree {..} =
+   seq bloom $
    set radixBloom bloom $
    set radixBuffer buffer $
    set radixCache cache $
@@ -227,6 +230,7 @@ insertRadixTreeBefore
    -> RadixTree -- ^ Radix tree.
    -> RadixTree
 insertRadixTreeBefore (root :| roots, branch :| branches, prefix :| _, overflow, _, cache) value tree@RadixTree {..} =
+   seq bloom $
    set radixBloom bloom $
    set radixBuffer buffer $
    set radixCache cache $
@@ -252,6 +256,7 @@ insertRadixTreeBetween
    -> RadixTree -- ^ Radix tree.
    -> RadixTree
 insertRadixTreeBetween (root :| roots, branch :| branches, prefix :| _, prefixOverflow, keyOverflow, cache) value tree@RadixTree {..} =
+   seq bloom $
    set radixBloom bloom $
    set radixBuffer buffer $
    set radixCache cache $
@@ -295,7 +300,7 @@ deleteRadixTree key tree@RadixTree {..} =
                      [] -> do
                         let bloom = insert defaultRoot _radixBloom
                         let buffer = storeHot defaultRoot def $ freeHot root _radixBuffer
-                        pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase defaultRoot
+                        seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase defaultRoot
                      (parentRoot, parentBranch, parentTest):ancestors -> do
                         if isJust $ view radixLeaf parentBranch
                         then do
@@ -305,7 +310,7 @@ deleteRadixTree key tree@RadixTree {..} =
                            let bloom = insertList (root':drop 1 roots) _radixBloom
                            let buffer = merkleSpoof root' grandparent $ storeHot root' branch' $ freeHot root _radixBuffer
                            let state = bool _radixRoot root' $ null ancestors
-                           pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
+                           seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
                         else case view (bool radixLeft radixRight $ not $ head prefix) parentBranch of
                            Nothing -> fail "deleteRadixTree: impossible"
                            Just sibRoot -> do
@@ -324,7 +329,7 @@ deleteRadixTree key tree@RadixTree {..} =
                                     let bloom = insertList (root':drop 1 roots) _radixBloom
                                     let buffer = merkleSpoof root' grandparent $ storeHot root' branch' $ freeHot parentRoot $ freeHot root _radixBuffer
                                     let state = bool _radixRoot root' $ null ancestors
-                                    pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+                                    seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
                   Just right -> do
                      childResult <- 
                         case loadHot right _radixBuffer of
@@ -341,7 +346,7 @@ deleteRadixTree key tree@RadixTree {..} =
                            let bloom = insertList (root':roots) _radixBloom
                            let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
                            let state = bool _radixRoot root' $ null roots
-                           pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+                           seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
                Just left -> case view radixRight branch of
                   Nothing -> do
                      childResult <- 
@@ -359,7 +364,7 @@ deleteRadixTree key tree@RadixTree {..} =
                            let bloom = insertList (root':roots) _radixBloom
                            let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
                            let state = bool _radixRoot root' $ null roots
-                           pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
+                           seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
                   Just _ -> do
                      let branch' = set radixLeaf Nothing branch
                      let root' = createRoot branch'
@@ -367,7 +372,7 @@ deleteRadixTree key tree@RadixTree {..} =
                      let bloom = insertList (root':roots) _radixBloom
                      let buffer =  merkleSpoof root' parent $ storeHot root' branch' $ freeHot root _radixBuffer
                      let state = bool _radixRoot root' $ null roots
-                     pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
+                     seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase state
 
 -- |
 -- Lookup a value in a radix tree.
