@@ -10,7 +10,6 @@ module Network.DFINITY.RadixTree.Lenses
    , radixPrefix
    , radixLeft
    , radixRight
-   , radixChild
    , radixLeaf
    , radixBloom
    , radixBloomBits
@@ -19,10 +18,16 @@ module Network.DFINITY.RadixTree.Lenses
    , radixCheckpoint
    , radixDatabase
    , radixRoot
+   , setPrefix
+   , setLeft
+   , setRight
+   , setChild
+   , setLeaf
    ) where
 
 import Data.Bool (bool)
-import Lens.Simple (Lens', makeLenses)
+import Data.ByteString (ByteString)
+import Lens.Simple (makeLenses, set)
 
 import Network.DFINITY.RadixTree.Types
 
@@ -30,5 +35,17 @@ makeLenses ''RadixPrefix
 makeLenses ''RadixBranch
 makeLenses ''RadixTree
 
-radixChild :: Bool -> Lens' RadixBranch (Maybe RadixRoot)
-radixChild = bool radixLeft radixRight
+setPrefix :: Maybe RadixPrefix -> RadixBranch -> RadixBranch
+setPrefix = set radixPrefix
+
+setLeft :: Maybe RadixRoot -> RadixBranch -> RadixBranch
+setLeft = set radixLeft
+
+setRight :: Maybe RadixRoot -> RadixBranch -> RadixBranch
+setRight = set radixRight
+
+setChild :: Bool -> Maybe RadixRoot -> RadixBranch -> RadixBranch
+setChild =  bool setLeft setRight
+
+setLeaf :: Maybe ByteString -> RadixBranch -> RadixBranch
+setLeaf = set radixLeaf
