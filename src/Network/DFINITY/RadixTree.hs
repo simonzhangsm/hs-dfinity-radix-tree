@@ -13,23 +13,32 @@ module Network.DFINITY.RadixTree
    , merkleizeRadixTree
    , lookupMerkleizedRadixTree
    , lookupNonMerkleizedRadixTree
+   , sourceRadixTree
+   , sinkRadixTree
    , printMerkleizedRadixTree
    , printNonMerkleizedRadixTree
    ) where
 
-import Control.Monad (forM_)
+import Codec.Serialise (deserialise)
+import Control.Concurrent.Async (async, link)
+import Control.Concurrent.Chan (Chan, readChan)
+import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
+import Control.Monad (forM_, forever, when)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Resource (MonadResource)
 import Data.BloomFilter as Bloom (elem, insert, insertList)
 import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Lazy (fromStrict)
+import Data.ByteString.Short (fromShort)
+import Data.Conduit (Sink, Source, yield)
 import Data.Default.Class (def)
 import Data.List.NonEmpty (NonEmpty(..), fromList)
-import Data.LruCache as LRU (empty)
+import Data.LruCache as LRU (empty, insert, lookup)
 import Data.Map.Strict as Map (empty)
 import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
 import Data.Tuple (swap)
-import Database.LevelDB (Options(..), open)
+import Database.LevelDB (Options(..), defaultReadOptions, get, open)
 
 import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Bloom
@@ -172,7 +181,7 @@ initializeRadixTree key value tree@RadixTree {..} =
    prefix = createPrefix $ toBits key
    branch = setPrefix prefix $ Just value `setLeaf` def
    root = createRoot branch
-   bloom = insert root _radixBloom
+   bloom = Bloom.insert root _radixBloom
    buffer = storeHot root branch _radixBuffer
 
 -- |
@@ -298,7 +307,7 @@ deleteRadixTree key tree@RadixTree {..} =
                Nothing -> case getRight branch of
                   Nothing -> case zip3 roots branches $ map head $ prefix:prefixes of
                      [] -> do
-                        let bloom = insert defaultRoot _radixBloom
+                        let bloom = Bloom.insert defaultRoot _radixBloom
                         let buffer = storeHot defaultRoot def _radixBuffer
                         seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache _radixCheckpoint _radixDatabase defaultRoot
                      (_, parentBranch, parentTest):ancestors -> do
@@ -431,7 +440,7 @@ merkleizeRadixTree
    => RadixTree -- ^ Radix tree.
    -> m (RadixRoot, RadixTree)
 merkleizeRadixTree RadixTree {..} = do
-   (root, cache) <- liftIO $ loop _radixRoot _radixCache
+   (root, cache) <- loop _radixRoot _radixCache
    let tree = RadixTree bloom _radixBloomBits Map.empty cache root _radixDatabase root
    pure (root, tree)
    where
@@ -440,9 +449,9 @@ merkleizeRadixTree RadixTree {..} = do
       if not $ Bloom.elem root _radixBloom
       then pure (root, cache)
       else do
-         result <- load root
+         result <- load
          case result of
-            Nothing -> error "loop: :("
+            Nothing -> error "merkleizeRadixTree: state root does not exist"
             Just (branch@RadixBranch {..}, cache') ->
                case _radixLeft of
                   Nothing ->
@@ -451,24 +460,66 @@ merkleizeRadixTree RadixTree {..} = do
                            storeCold branch cache' _radixDatabase
                         Just right -> do
                            (root', cache'') <- loop right cache'
-                           let branch' = RadixBranch _radixPrefix Nothing (Just root') _radixLeaf
+                           let branch' = True `setChild` Just root' $ branch
                            storeCold branch' cache'' _radixDatabase
                   Just left ->
                      case _radixRight of
                         Nothing -> do
                            (root', cache'') <- loop left cache'
-                           let branch' = RadixBranch _radixPrefix (Just root') Nothing _radixLeaf
+                           let branch' = False `setChild` Just root' $ branch
                            storeCold branch' cache'' _radixDatabase
                         Just right -> do
                            (root', cache'') <- loop left cache'
                            (root'', cache''') <- loop right cache''
-                           let branch' = RadixBranch _radixPrefix (Just root') (Just root'') _radixLeaf
+                           let branch' = setChildren (Just root', Just root'') branch
                            storeCold branch' cache''' _radixDatabase
       where
-      load root' =
-         case loadHot root' _radixBuffer of
-            Nothing -> loadCold root' _radixCache _radixDatabase
+      load =
+         case loadHot root _radixBuffer of
+            Nothing -> loadCold root cache _radixDatabase
             Just branch -> pure $ Just (branch, cache)
+
+-- |
+-- Create a conduit source from a radix tree.
+sourceRadixTree
+   :: MonadIO m
+   => [Bool] -- ^ Bit pattern.
+   -> Chan RadixRoot -- ^ Terminal state roots.
+   -> Int -- ^ LRU cache size.
+   -> RadixTree -- ^ Radix tree.
+   -> Source m ByteString
+sourceRadixTree patten chan size = \ tree -> do
+   cache <- liftIO $ newMVar $ LRU.empty size
+   action <- liftIO $ async $ forever $ do
+      root <- readChan chan
+      modifyMVar_ cache $ pure . LRU.insert root ()
+   liftIO $ link action
+   loop cache tree [] where
+   loop cache tree@RadixTree {..} roots = do
+      seen <- liftIO $ readMVar cache
+      let roots' = _radixCheckpoint:roots
+      if flip any roots' $ isJust . flip LRU.lookup seen
+      then pure ()
+      else do
+         let key = fromShort _radixCheckpoint
+         result <- get _radixDatabase defaultReadOptions key
+         case result of
+            Nothing -> fail "sourceRadixTree: state root does not exist"
+            Just bytes -> do
+               let RadixBranch {..} = deserialise $ fromStrict bytes
+               let ok = all id $ zipWith (==) patten $ toBits $ fromShort _radixCheckpoint
+               when ok $ yield bytes
+               forM_ [_radixLeft, _radixRight] $ \ case
+                  Nothing -> pure ()
+                  Just root -> loop cache `flip` roots' $ setCheckpoint root tree
+
+-- |
+-- Create a radix tree from a conduit sink.
+sinkRadixTree
+   :: MonadIO m
+   => Chan RadixRoot -- ^ Terminal state roots.
+   -> Sink ByteString m RadixTree
+sinkRadixTree = undefined
 
 -- |
 -- Print a radix tree.
