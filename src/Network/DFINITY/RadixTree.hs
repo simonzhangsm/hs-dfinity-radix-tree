@@ -20,7 +20,7 @@ module Network.DFINITY.RadixTree
    ) where
 
 import Codec.Serialise (deserialise)
-import Control.Concurrent (forkIO, killThread)
+import Control.Concurrent.Async (async, cancel, link)
 import Control.Concurrent.BoundedChan (BoundedChan, readChan)
 import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
 import Control.Exception (throw)
@@ -494,11 +494,12 @@ sourceRadixTree
    -> Source m ByteString
 sourceRadixTree chan patten size = \ tree -> do
    cache <- liftIO $ newMVar $ LRU.empty size
-   thread <- liftIO $ forkIO $ forever $ do
+   action <- liftIO $ async $ forever $ do
       root <- readChan chan
       modifyMVar_ cache $ pure . LRU.insert root ()
+   liftIO $ link action
    tree' <- loop cache tree []
-   liftIO $ killThread thread
+   liftIO $ cancel action
    pure tree'
    where
    loop cache tree@RadixTree {..} roots = do
