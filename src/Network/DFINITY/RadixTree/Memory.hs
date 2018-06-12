@@ -7,7 +7,6 @@ module Network.DFINITY.RadixTree.Memory
    , loadCold
    , storeHot
    , storeCold
-   , freeHot
    ) where
 
 import Codec.Serialise (deserialise, serialise)
@@ -17,21 +16,23 @@ import Data.ByteString.Char8 as Byte (take)
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Data.ByteString.Short (fromShort, toShort)
 import Data.LruCache as LRU (insert, lookup)
-import Data.Map.Strict as Map (delete, insert, lookup)
+import Data.Map.Strict as Map (insert, lookup)
 import Database.LevelDB (defaultReadOptions, defaultWriteOptions, get, put)
 
 import Network.DFINITY.RadixTree.Types
 
--- |
--- Load a branch from memory.
 loadHot
-   :: RadixRoot -- ^ State root.
+   :: MonadIO m
+   => RadixRoot -- ^ State root.
    -> RadixBuffer -- ^ Buffer.
-   -> Maybe RadixBranch
-loadHot = Map.lookup
+   -> RadixCache -- ^ Cache.
+   -> RadixDatabase -- ^ Database.
+   -> m (Maybe (RadixBranch, RadixCache))
+loadHot root buffer cache database =
+   case Map.lookup root buffer of
+      Just branch -> pure $ Just (branch, cache)
+      Nothing -> loadCold root cache database
 
--- |
--- Load a branch from persistent memory.
 loadCold
    :: MonadIO m
    => RadixRoot -- ^ State root.
@@ -52,8 +53,6 @@ loadCold root cache database =
                seq cache' $ seq branch $ pure $ Just (branch, cache')
             Nothing -> pure $ Nothing
 
--- |
--- Store a branch in memory.
 storeHot
    :: RadixRoot -- ^ State root.
    -> RadixBranch -- ^ Branch.
@@ -61,8 +60,6 @@ storeHot
    -> RadixBuffer
 storeHot = Map.insert
 
--- |
--- Store a branch in persistent memory.
 storeCold
    :: MonadIO m
    => RadixBranch -- ^ Branch.
@@ -77,11 +74,3 @@ storeCold branch cache database = do
    key = Byte.take 20 $ hash bytes
    root = toShort key
    cache' = LRU.insert root branch cache
-
--- |
--- Free a branch in memory.
-freeHot
-   :: RadixRoot -- ^ State root.
-   -> RadixBuffer -- ^ Buffer.
-   -> RadixBuffer
-freeHot = Map.delete
