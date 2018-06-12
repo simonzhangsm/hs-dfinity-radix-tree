@@ -23,6 +23,7 @@ import Codec.Serialise (deserialise)
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.BoundedChan (BoundedChan, readChan)
 import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
+import Control.Exception (throw)
 import Control.Monad (forM_, forever, when)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Resource (MonadResource)
@@ -67,7 +68,7 @@ createRadixTree bits size path checkpoint
             Just root -> do
                result <- loadCold root cache database
                case snd <$> result of
-                  Nothing -> fail "createRadixTree: state root does not exist"
+                  Nothing -> throw StateRootDoesNotExist
                   Just cache' -> pure (root, cache')
       pure $ RadixTree bloom bits Map.empty cache' root database root
       where
@@ -99,7 +100,7 @@ insertRadixTree key value tree@RadixTree {..} =
          pure $ insertRadixTreeBefore result value tree
       Just result ->
          pure $ insertRadixTreeBetween result value tree
-      Nothing -> fail "insertRadixTree: state root does not exist"
+      Nothing -> throw StateRootDoesNotExist
 
 -- |
 -- Search for a value in a radix tree.
@@ -295,7 +296,7 @@ deleteRadixTree key tree@RadixTree {..} =
    if isEmptyRadixTree tree
    then pure tree
    else searchNonMerkleizedRadixTree key tree >>= \ case
-      Nothing -> fail "deleteRadixTree: state root does not exist"
+      Nothing -> throw StateRootDoesNotExist
       Just result@(_ :| roots, RadixBranch {..} :| branches, prefix :| prefixes, prefixOverflow, keyOverflow, cache) ->
          if not $ null prefixOverflow && null keyOverflow
          then pure tree
@@ -321,7 +322,7 @@ deleteRadixTree key tree@RadixTree {..} =
                         Just sibRoot -> do
                            sibResult <- loadHot sibRoot _radixBuffer cache _radixDatabase
                            case sibResult of
-                              Nothing -> fail "deleteRadixTree: sibling state root does not exist"
+                              Nothing -> throw StateRootDoesNotExist
                               Just (sibBranch, cache') -> do
                                  let bits' = head prefixes ++ (not $ head prefix):(maybe [] toBits $ getPrefix sibBranch)
                                  let prefix' = createPrefix $ drop 1 bits' `bool` bits' $ null ancestors
@@ -334,12 +335,12 @@ deleteRadixTree key tree@RadixTree {..} =
                                  seq bloom $ pure $ RadixTree bloom _radixBloomBits buffer cache' _radixCheckpoint _radixDatabase state
             (Just child, Nothing) -> do
                loadHot child _radixBuffer cache _radixDatabase >>= \ case
-                  Nothing -> fail "deleteRadixTree: state root does not exist"
+                  Nothing -> throw StateRootDoesNotExist
                   Just (branch', cache') -> do
                      pure $ deleteRadixTreeOneChild result branch' cache' False tree
             (Nothing, Just child) ->
                loadHot child _radixBuffer cache _radixDatabase >>= \ case
-                  Nothing -> fail "deleteRadixTree: state root does not exist"
+                  Nothing -> throw StateRootDoesNotExist
                   Just (branch', cache') -> do
                      pure $ deleteRadixTreeOneChild result branch' cache' True tree
             _ ->
@@ -401,7 +402,7 @@ lookupRadixTree
 lookupRadixTree search key tree = do
    result <- search key tree
    case result of
-      Nothing -> fail "lookupRadixTree: state root does not exist"
+      Nothing -> throw StateRootDoesNotExist
       Just (_, RadixBranch {..} :| _, _, prefixOverflow, keyOverflow, cache') ->
          if not $ null prefixOverflow && null keyOverflow
          then pure Nothing
@@ -459,7 +460,7 @@ merkleizeRadixTree RadixTree {..} = do
          -- Load the root branch.
          result <- loadHot root _radixBuffer cache _radixDatabase
          case result of
-            Nothing -> error "merkleizeRadixTree: state root does not exist"
+            Nothing -> throw StateRootDoesNotExist
             Just (branch@RadixBranch {..}, cache') ->
                case (_radixLeft, _radixRight) of
                   -- No children.
@@ -509,7 +510,7 @@ sourceRadixTree chan patten size = \ tree -> do
          let key = fromShort _radixCheckpoint
          result <- get _radixDatabase defaultReadOptions key
          case result of
-            Nothing -> fail "sourceRadixTree: state root does not exist"
+            Nothing -> throw StateRootDoesNotExist
             Just bytes -> do
                let RadixBranch {..} = deserialise $ fromStrict bytes
                let success = all id $ zipWith (==) patten $ toBits $ fromShort _radixCheckpoint
@@ -542,7 +543,7 @@ printRadixTree flag load = \ tree@RadixTree {..} -> do
    loop tree@RadixTree {..} i = do
       result <- load tree
       case fst <$> result of
-         Nothing -> fail "printRadixTree: state root does not exist"
+         Nothing -> throw StateRootDoesNotExist
          Just branch@RadixBranch {..} -> do
             let indent = (++) $ concat $ replicate i "｜"
             liftIO $ putStrLn $ indent $ show branch

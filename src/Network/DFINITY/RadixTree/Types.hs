@@ -9,6 +9,7 @@ module Network.DFINITY.RadixTree.Types
    , RadixBuffer
    , RadixCache
    , RadixDatabase
+   , RadixError(..)
    , RadixPrefix(..)
    , RadixRoot
    , RadixSearchResult
@@ -20,6 +21,7 @@ import Codec.Serialise.Decoding (decodeBytes, decodeInt, decodeListLen)
 import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
 import Crypto.Hash.SHA256 (hash)
 import Control.DeepSeq (NFData(..))
+import Control.Exception (Exception)
 import Control.Monad (void)
 import Data.BloomFilter (Bloom)
 import Data.Bool (bool)
@@ -99,6 +101,12 @@ type RadixBuffer = Map RadixRoot RadixBranch
 type RadixCache = LruCache RadixRoot RadixBranch
 
 type RadixDatabase = DB
+
+data RadixError
+   = StateRootDoesNotExist
+     deriving (Data, Eq, Show)
+
+instance Exception RadixError
 
 data RadixPrefix
    = RadixPrefix
