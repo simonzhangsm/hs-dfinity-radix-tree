@@ -20,13 +20,13 @@ module Network.DFINITY.RadixTree
    ) where
 
 import Codec.Serialise (deserialise)
-import Control.Concurrent.Async (async, cancel, link)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.BoundedChan (BoundedChan, readChan)
 import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
 import Control.Exception (throw)
 import Control.Monad (forM_, forever, when)
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Trans.Resource (MonadResource)
+import Control.Monad.Trans.Resource (MonadResource, allocate, release)
 import Data.BloomFilter as Bloom (elem, insert, insertList)
 import Data.Bool (bool)
 import Data.ByteString.Char8 as Byte (ByteString)
@@ -494,12 +494,11 @@ sourceRadixTree
    -> Source m ByteString
 sourceRadixTree chan patten size = \ tree -> do
    cache <- liftIO $ newMVar $ LRU.empty size
-   action <- liftIO $ async $ forever $ do
+   (,) action _ <- flip allocate killThread $ forkIO $ forever $ do
       root <- readChan chan
       modifyMVar_ cache $ pure . LRU.insert root ()
-   liftIO $ link action
    tree' <- loop cache tree []
-   liftIO $ cancel action
+   release action
    pure tree'
    where
    loop cache tree@RadixTree {..} roots = do
