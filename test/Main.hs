@@ -32,7 +32,7 @@ data Args
    } deriving Data
 
 instance Default Args where
-   def = Args "test/testdb" "test/tests.json" "empty"
+   def = Args "test/testdb" "test/tests.json" "*"
 
 data Op
    = Insert ByteString ByteString
