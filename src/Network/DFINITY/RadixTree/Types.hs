@@ -103,7 +103,8 @@ type RadixCache = LruCache RadixRoot RadixBranch
 type RadixDatabase = DB
 
 data RadixError
-   = StateRootDoesNotExist
+   = InvalidArgument String
+   | StateRootDoesNotExist RadixRoot
      deriving (Data, Eq, Show)
 
 instance Exception RadixError
@@ -149,9 +150,10 @@ type RadixSearchResult = (NonEmpty RadixRoot, NonEmpty RadixBranch, NonEmpty [Bo
 data RadixTree
    = RadixTree
    { _radixBloom :: RadixBloom
-   , _radixBloomBits :: Int
+   , _radixBloomSize :: Int
    , _radixBuffer :: RadixBuffer
    , _radixCache :: RadixCache
+   , _radixCacheSize :: Int
    , _radixCheckpoint :: RadixRoot
    , _radixDatabase :: RadixDatabase
    , _radixRoot :: RadixRoot
