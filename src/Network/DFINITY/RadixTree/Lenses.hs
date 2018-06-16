@@ -9,6 +9,7 @@ module Network.DFINITY.RadixTree.Lenses
    , getLeft
    , getRight
    , getChild
+   , getChildren
    , getLeaf
    , getBloom
    , getBuffer
@@ -48,6 +49,9 @@ getRight = view radixRight
 
 getChild :: Bool -> RadixBranch -> Maybe RadixRoot
 getChild = bool getLeft getRight
+
+getChildren :: RadixBranch -> (Maybe RadixRoot, Maybe RadixRoot)
+getChildren branch = (getLeft branch, getRight branch)
 
 getLeaf :: RadixBranch -> Maybe ByteString
 getLeaf = view radixLeaf
