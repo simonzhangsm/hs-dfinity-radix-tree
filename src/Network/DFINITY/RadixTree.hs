@@ -594,32 +594,34 @@ sourceMerkleizedRadixTree
    -> BoundedChan RadixRoot
    -> RadixTree
    -> Source (ResourceT IO) ByteString #-}
-sourceMerkleizedRadixTree patten cacheSize chan = \ tree -> do
-   cache <- liftIO $ newMVar $ LRU.empty cacheSize
-   (,) action _ <- flip allocate killThread $ forkIO $ forever $ do
-      root <- readChan chan
-      modifyMVar_ cache $ pure . LRU.insert root ()
-   tree' <- loop cache tree []
-   release action
-   pure tree'
-   where
-   loop cache tree@RadixTree {..} roots = do
-      seen <- liftIO $ readMVar cache
-      let roots' = _radixCheckpoint:roots
-      if flip any roots' $ isJust . flip LRU.lookup seen
-      then pure ()
-      else do
-         let key = fromShort _radixCheckpoint
-         result <- get _radixDatabase defaultReadOptions key
-         case result of
-            Nothing -> pure ()
-            Just bytes -> do
-               let RadixBranch {..} = deserialise $ fromStrict bytes
-               let success = all id $ zipWith (==) patten $ toBits $ fromShort _radixCheckpoint
-               when success $ yield bytes
-               forM_ [_radixLeft, _radixRight] $ \ case
-                  Nothing -> pure ()
-                  Just root -> loop cache `flip` roots' $ setCheckpoint root tree
+sourceMerkleizedRadixTree patten cacheSize chan
+   | cacheSize <= 0 = throw $ InvalidArgument "invalid LRU cache size"
+   | otherwise = \ tree -> do
+      cache <- liftIO $ newMVar $ LRU.empty cacheSize
+      (,) action _ <- flip allocate killThread $ forkIO $ forever $ do
+         root <- readChan chan
+         modifyMVar_ cache $ pure . LRU.insert root ()
+      tree' <- loop cache tree []
+      release action
+      pure tree'
+      where
+      loop cache tree@RadixTree {..} roots = do
+         seen <- liftIO $ readMVar cache
+         let roots' = _radixCheckpoint:roots
+         if flip any roots' $ isJust . flip LRU.lookup seen
+         then pure ()
+         else do
+            let key = fromShort _radixCheckpoint
+            result <- get _radixDatabase defaultReadOptions key
+            case result of
+               Nothing -> pure ()
+               Just bytes -> do
+                  let RadixBranch {..} = deserialise $ fromStrict bytes
+                  let success = all id $ zipWith (==) patten $ toBits $ fromShort _radixCheckpoint
+                  when success $ yield bytes
+                  forM_ [_radixLeft, _radixRight] $ \ case
+                     Nothing -> pure ()
+                     Just root -> loop cache `flip` roots' $ setCheckpoint root tree
 
 -- |
 -- Create a Merkleized radix tree from a conduit.
