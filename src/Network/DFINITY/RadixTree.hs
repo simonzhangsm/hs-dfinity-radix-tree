@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS -Wall #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 
 module Network.DFINITY.RadixTree
    ( RadixRoot
@@ -223,6 +224,7 @@ insertRadixTree key value tree =
    if isEmptyRadixTree tree
    then pure $ initializeRadixTree key value tree
    else searchNonMerkleizedRadixTree key tree >>= \ case
+      Left err -> throw err
       Right result@(_, _, _, [], [], _) ->
          pure $ insertRadixTreeAt result value tree
       Right result@(_, _, _, [], _, _) ->
@@ -231,7 +233,6 @@ insertRadixTree key value tree =
          pure $ insertRadixTreeBefore result value tree
       Right result ->
          pure $ insertRadixTreeBetween result value tree
-      Left err -> throw err
 
 -- TODO (enzo): Document behavior.
 initializeRadixTree
