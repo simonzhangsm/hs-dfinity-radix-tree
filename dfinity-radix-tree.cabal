@@ -14,7 +14,7 @@ cabal-version: >=1.10
 library
    build-depends:
       BoundedChan,
-      base,
+      base >=4.10 && <5,
       base16-bytestring,
       bloomfilter,
       bytestring,
@@ -52,7 +52,7 @@ library
 executable dfinity-radix-tree-unit-tests
    build-depends:
       aeson,
-      base,
+      base >=4.10 && <5,
       base16-bytestring,
       bytestring,
       cmdargs,
@@ -73,7 +73,7 @@ executable dfinity-radix-tree-unit-tests
 
 executable dfinity-radix-tree-benchmarks
    build-depends:
-      base,
+      base >=4.10 && <5,
       bytestring,
       cmdargs,
       cryptohash-sha256,
