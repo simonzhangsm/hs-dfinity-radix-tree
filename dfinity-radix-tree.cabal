@@ -1,6 +1,6 @@
 name:          dfinity-radix-tree
 version:       0.0.0
-synopsis:      A persistent binary radix tree.
+synopsis:      A binary radix tree.
 homepage:      https://github.com/dfinity-lab/hs-radix-tree
 license:       GPL-3
 license-file:  LICENSE

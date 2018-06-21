@@ -4,23 +4,49 @@
 {-# OPTIONS -Wall #-}
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 
-module Network.DFINITY.RadixTree
-   ( RadixRoot
+-- |
+-- Module     : Network.DFINITY.RadixTree
+-- Copyright  : 2018 DFINITY Stiftung
+-- License    : GPL-3
+-- Maintainer : Enzo Haussecker <enzo@dfinity.org>
+-- Stability  : Stable
+--
+-- A binary radix tree.
+module Network.DFINITY.RadixTree (
+
+   -- ** Types
+     RadixRoot
    , RadixTree
    , RadixError(..)
+
+   -- ** Create
    , createRadixTree
    , subtreeRadixTree
-   , isEmptyRadixTree
-   , isValidStateRoot
+
+   -- ** Insert
    , insertRadixTree
+
+   -- ** Delete
    , deleteRadixTree
+
+   -- ** Merkleize
    , merkleizeRadixTree
+
+   -- ** Query
    , lookupMerkleizedRadixTree
    , lookupNonMerkleizedRadixTree
+
+   -- ** Test
+   , isEmptyRadixTree
+   , isValidRadixRoot
+
+   -- ** Stream
    , sourceMerkleizedRadixTree
-   , sinkMerkleizedRadixTree
+
+   -- ** Debug
    , printMerkleizedRadixTree
    , printNonMerkleizedRadixTree
+
    ) where
 
 import Codec.Serialise (deserialise)
@@ -36,7 +62,7 @@ import Data.Bool (bool)
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lazy (fromStrict)
 import Data.ByteString.Short (fromShort)
-import Data.Conduit (Sink, Source, yield)
+import Data.Conduit (Source, yield)
 import Data.Default.Class (def)
 import Data.List.NonEmpty (NonEmpty(..), fromList)
 import Data.LruCache as LRU (empty, insert, lookup)
@@ -115,16 +141,16 @@ isEmptyRadixTree = (==) defaultRoot . _radixRoot
 
 -- |
 -- Check if a state root is valid.
-isValidStateRoot
+isValidRadixRoot
    :: MonadIO m
    => RadixRoot -- ^ State root.
    -> RadixTree -- ^ Radix tree.
    -> m Bool
-{-# SPECIALISE isValidStateRoot
+{-# SPECIALISE isValidRadixRoot
    :: RadixRoot
    -> RadixTree
    -> ResourceT IO Bool #-}
-isValidStateRoot root RadixTree {..} =
+isValidRadixRoot root RadixTree {..} =
    isJust <$> get _radixDatabase defaultReadOptions key
    where
    key = fromShort root
@@ -234,7 +260,7 @@ insertRadixTree key value tree =
       Right result ->
          pure $ insertRadixTreeBetween result value tree
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 initializeRadixTree
    :: ByteString -- ^ Key.
    -> ByteString -- ^ Value.
@@ -250,7 +276,7 @@ initializeRadixTree key value tree@RadixTree {..} =
    bloom = Bloom.insert root _radixBloom
    buffer = storeHot root branch _radixBuffer
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 insertRadixTreeAt
    :: RadixSearchResult -- ^ Search result.
    -> ByteString -- ^ Value.
@@ -267,7 +293,7 @@ insertRadixTreeAt (_:|roots, branch:|branches, prefix:|_, _, _, cache) value tre
    buffer = merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 insertRadixTreeAfter
    :: RadixSearchResult -- ^ Search result.
    -> ByteString -- ^ Value.
@@ -288,7 +314,7 @@ insertRadixTreeAfter (_:|roots, branch:|branches, prefix:|_, _, keyOverflow, cac
    buffer = merkleSpoof root'' parent $ storeHot root'' branch'' $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root'' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 insertRadixTreeBefore
    :: RadixSearchResult -- ^ Search result.
    -> ByteString -- ^ Value.
@@ -310,7 +336,7 @@ insertRadixTreeBefore (_:|roots, branch:|branches, prefix:|_, prefixOverflow, _,
    buffer = merkleSpoof root'' parent $ storeHot root'' branch'' $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root'' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 insertRadixTreeBetween
    :: RadixSearchResult -- ^ Search result.
    -> ByteString -- ^ Value.
@@ -354,10 +380,13 @@ deleteRadixTree key tree@RadixTree {..} =
       Left err -> throw err
       Right result@(_, branches, prefix:|_, [], [], cache) ->
          case branches of
+            -- No children and no parent.
             RadixBranch _ Nothing Nothing _:|[] ->
                pure $ deleteRadixTreeNoChildrenNoParent result tree
+            -- No children and parent with leaf.
             RadixBranch _ Nothing Nothing _:|parent:_ | isJust $ getLeaf parent ->
                pure $ deleteRadixTreeNoChildrenParentWithLeaf result tree
+            -- No children and parent without leaf.
             RadixBranch _ Nothing Nothing _:|parent:_ -> do
                let test = not $ head prefix
                let root = fromJust $ getChild test parent
@@ -365,6 +394,7 @@ deleteRadixTree key tree@RadixTree {..} =
                   Nothing -> throw $ StateRootDoesNotExist root
                   Just (branch, cache') ->
                      pure $ deleteRadixTreeNoChildrenParentWithoutLeaf result branch cache' test tree
+            -- One left child.
             RadixBranch _ child Nothing _:|_ | isJust child -> do
                let test = False
                let root = fromJust child
@@ -372,6 +402,7 @@ deleteRadixTree key tree@RadixTree {..} =
                   Nothing -> throw $ StateRootDoesNotExist root
                   Just (branch, cache') ->
                      pure $ deleteRadixTreeOneChild result branch cache' test tree
+            -- One right child.
             RadixBranch _ Nothing child _:|_ | isJust child -> do
                let test = True
                let root = fromJust child
@@ -379,10 +410,11 @@ deleteRadixTree key tree@RadixTree {..} =
                   Nothing -> throw $ StateRootDoesNotExist root
                   Just (branch, cache') ->
                      pure $ deleteRadixTreeOneChild result branch cache' test tree
+            -- Two children.
             _ -> pure $ deleteRadixTreeTwoChildren result tree
       Right _ -> pure tree
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenNoParent
    :: RadixSearchResult -- ^ Search result.
    -> RadixTree -- ^ Radix tree.
@@ -395,7 +427,7 @@ deleteRadixTreeNoChildrenNoParent (_, _, _, _, _, cache) tree@RadixTree {..} =
    buffer = storeHot defaultRoot def _radixBuffer
    state = defaultRoot
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenParentWithLeaf
    :: RadixSearchResult -- ^ Search result.
    -> RadixTree -- ^ Radix tree.
@@ -412,7 +444,7 @@ deleteRadixTreeNoChildrenParentWithLeaf (_:|_:roots, _:|branch:branches, prefix:
    buffer = merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenParentWithoutLeaf
    :: RadixSearchResult -- ^ Search result.
    -> RadixBranch -- ^ Branch.
@@ -433,7 +465,7 @@ deleteRadixTreeNoChildrenParentWithoutLeaf (_:|_:roots, _:|_:branches, _:|prefix
    buffer = merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 deleteRadixTreeOneChild
    :: RadixSearchResult -- ^ Search result.
    -> RadixBranch -- ^ Branch.
@@ -454,7 +486,7 @@ deleteRadixTreeOneChild (_:|roots, _:|branches, prefix:|_, _, _, _) branch@Radix
    buffer =  merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
 
--- TODO (enzo): Document behavior.
+-- TODO (enzo): Documentation.
 deleteRadixTreeTwoChildren
    :: RadixSearchResult -- ^ Search result.
    -> RadixTree -- ^ Radix tree.
@@ -535,7 +567,7 @@ merkleSpoof mask = \ case
       storeHot root $ test `setChild` Just mask $ branch
 
 -- |
--- Merkleize a radix tree.
+-- Merkleize a radix tree. This will flush the buffer to disk.
 merkleizeRadixTree
    :: MonadIO m
    => RadixTree -- ^ Radix tree.
@@ -601,9 +633,8 @@ sourceMerkleizedRadixTree patten cacheSize chan
       (,) action _ <- flip allocate killThread $ forkIO $ forever $ do
          root <- readChan chan
          modifyMVar_ cache $ pure . LRU.insert root ()
-      tree' <- loop cache tree []
+      loop cache tree []
       release action
-      pure tree'
       where
       loop cache tree@RadixTree {..} roots = do
          seen <- liftIO $ readMVar cache
@@ -622,25 +653,6 @@ sourceMerkleizedRadixTree patten cacheSize chan
                   forM_ [_radixLeft, _radixRight] $ \ case
                      Nothing -> pure ()
                      Just root -> loop cache `flip` roots' $ setCheckpoint root tree
-
--- |
--- Create a Merkleized radix tree from a conduit.
-sinkMerkleizedRadixTree
-   :: MonadResource m
-   => Int -- ^ Bloom filter size in bits.
-   -> Int -- ^ LRU cache size in items.
-   -> BoundedChan RadixRoot -- ^ Terminal state root consumer.
-   -> FilePath -- ^ LevelDB database.
-   -> RadixRoot -- ^ Target state root.
-   -> Sink ByteString m (Either [RadixRoot] RadixTree)
-{-# SPECIALISE sinkMerkleizedRadixTree
-   :: Int
-   -> Int
-   -> BoundedChan RadixRoot
-   -> FilePath
-   -> RadixRoot
-   -> Sink ByteString (ResourceT IO) (Either [RadixRoot] RadixTree) #-}
-sinkMerkleizedRadixTree {- bloomSize cacheSize chan file checkpoint -} = undefined
 
 -- |
 -- Print a radix tree.
