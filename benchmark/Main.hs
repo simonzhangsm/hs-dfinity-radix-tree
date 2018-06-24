@@ -2,15 +2,18 @@
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS -Wall #-}
+{-# OPTIONS -fno-cse #-}
 
 module Main where
 
 import Control.Monad (foldM)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Resource (runResourceT)
-import Crypto.Hash.SHA256 (hash)
-import Data.ByteString.Char8 (ByteString, pack)
+import Crypto.Hash.SHA256 (hashlazy)
+import Data.ByteString.Builder (word32BE, toLazyByteString)
+import Data.ByteString.Char8 (ByteString)
 import Data.Default.Class (Default(..))
+import Data.Word (Word32)
 import System.Console.CmdArgs (Data, cmdArgs)
 
 import Network.DFINITY.RadixTree
@@ -27,25 +30,26 @@ step
    :: MonadIO m
    => (RadixTree -> ByteString -> m RadixTree)
    -> RadixTree
-   -> Int
+   -> Word32
    -> m RadixTree
-step action tree i =
+step action tree i = do
+   tree' <- action tree key
    if mod i 1000 == 0
-   then merkleizeRadixTree tree >>= flip action key . snd
-   else action tree key
-   where key = hash $ pack $ show i
+   then snd <$> merkleizeRadixTree tree'
+   else pure tree'
+   where key = hashlazy $ toLazyByteString $ word32BE i
 
 foldInsert
    :: MonadIO m
    => RadixTree
-   -> [Int]
+   -> [Word32]
    -> m RadixTree
 foldInsert = foldM $ step $ flip $ \ key -> insertRadixTree key key
 
 foldDelete
    :: MonadIO m
    => RadixTree
-   -> [Int]
+   -> [Word32]
    -> m RadixTree
 foldDelete = foldM $ step $ flip deleteRadixTree
 
@@ -53,8 +57,7 @@ main :: IO ()
 main = do
    Args {..} <- cmdArgs def
    runResourceT $ do
-      tree <- createRadixTree 1048576 6144 database Nothing
-      tree' <- foldInsert tree keys
-      tree'' <- foldDelete tree' keys
+      tree <- createRadixTree 262144 2048 database Nothing
+      tree' <- foldInsert tree [1..100000]
+      tree'' <- foldDelete tree' [1..100000]
       liftIO $ print $ isEmptyRadixTree tree''
-      where keys = [1..1000000]
