@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS -Wall #-}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
+{-# OPTIONS -Werror=incomplete-patterns #-}
 
 -- |
 -- Module     : Network.DFINITY.RadixTree
@@ -446,6 +446,8 @@ deleteRadixTreeNoChildrenParentWithLeaf (_:|_:roots, _:|branch:branches, prefix:
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
+deleteRadixTreeNoChildrenParentWithLeaf _ _ =
+   throw $ InvalidArgument "unknown parent"
 
 -- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenParentWithoutLeaf
@@ -467,6 +469,8 @@ deleteRadixTreeNoChildrenParentWithoutLeaf (_:|_:roots, _:|_:branches, _:|prefix
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' branch' _radixBuffer
    state = bool _radixRoot root' $ isNothing parent
+deleteRadixTreeNoChildrenParentWithoutLeaf _ _ _ _ _ =
+   throw $ InvalidArgument "unknown parent"
 
 -- TODO (enzo): Documentation.
 deleteRadixTreeOneChild
