@@ -8,12 +8,14 @@ module Network.DFINITY.RadixTree.Memory
    ) where
 
 import Codec.Serialise (deserialise, serialise)
+import Control.Monad.Trans.Resource (ResourceT)
 import Crypto.Hash.SHA256 (hash)
 import Data.ByteString.Char8 as Byte (take)
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Data.ByteString.Short (fromShort, toShort)
 import Data.LruCache as LRU (insert, lookup)
 import Data.Map.Strict as Map (insert, lookup)
+import Database.LevelDB (DB)
 
 import Network.DFINITY.RadixTree.Types
 
@@ -24,6 +26,12 @@ loadHot
    -> RadixCache
    -> database
    -> m (Maybe (RadixBranch, RadixCache))
+{-# SPECIALISE loadHot
+   :: RadixRoot
+   -> RadixBuffer
+   -> RadixCache
+   -> DB
+   -> ResourceT IO (Maybe (RadixBranch, RadixCache)) #-}
 loadHot root buffer cache database =
    case Map.lookup root buffer of
       Just branch -> pure $ Just (branch, cache)
@@ -35,6 +43,11 @@ loadCold
    -> RadixCache
    -> database
    -> m (Maybe (RadixBranch, RadixCache))
+{-# SPECIALISE loadCold
+   :: RadixRoot
+   -> RadixCache
+   -> DB
+   -> ResourceT IO (Maybe (RadixBranch, RadixCache)) #-}
 loadCold root cache database =
    case LRU.lookup root cache of
       Just (branch, cache') ->
@@ -62,6 +75,11 @@ storeCold
    -> RadixCache
    -> database
    -> m (RadixRoot, RadixCache)
+{-# SPECIALISE storeCold
+   :: RadixBranch
+   -> RadixCache
+   -> DB
+   -> ResourceT IO (RadixRoot, RadixCache) #-}
 storeCold branch cache database = do
    store database key bytes
    seq cache' $ pure (root, cache')
