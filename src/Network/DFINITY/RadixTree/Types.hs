@@ -1,4 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS -Wall #-}
@@ -8,7 +11,7 @@ module Network.DFINITY.RadixTree.Types
    , RadixBranch(..)
    , RadixBuffer
    , RadixCache
-   , RadixDatabase
+   , RadixDatabase(..)
    , RadixError(..)
    , RadixPrefix(..)
    , RadixRoot
@@ -19,10 +22,11 @@ module Network.DFINITY.RadixTree.Types
 import Codec.Serialise as CBOR (Serialise(..), serialise)
 import Codec.Serialise.Decoding (decodeBytes, decodeInt, decodeListLen)
 import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
-import Crypto.Hash.SHA256 (hash)
 import Control.DeepSeq (NFData(..))
 import Control.Exception (Exception)
 import Control.Monad (void)
+import Control.Monad.Trans.Resource (MonadResource)
+import Crypto.Hash.SHA256 (hash)
 import Data.BloomFilter (Bloom)
 import Data.Bool (bool)
 import Data.ByteString.Base16 as Base16 (encode)
@@ -36,7 +40,7 @@ import Data.LruCache (LruCache)
 import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
-import Database.LevelDB (DB)
+import Database.LevelDB (DB, Options, defaultReadOptions, defaultWriteOptions, get, open, put)
 import Text.Printf (printf)
 
 import Network.DFINITY.RadixTree.Bits
@@ -100,7 +104,15 @@ type RadixBuffer = Map RadixRoot RadixBranch
 
 type RadixCache = LruCache RadixRoot RadixBranch
 
-type RadixDatabase = DB
+class Monad m => RadixDatabase config m database | database -> config where
+   create :: config -> m database
+   load :: database -> ByteString -> m (Maybe ByteString)
+   store :: database -> ByteString -> ByteString -> m ()
+
+instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
+   create = uncurry open
+   load database = get database defaultReadOptions
+   store database = put database defaultWriteOptions
 
 data RadixError
    = InvalidArgument String
@@ -147,7 +159,7 @@ type RadixRoot = ShortByteString
 
 type RadixSearchResult = (NonEmpty RadixRoot, NonEmpty RadixBranch, NonEmpty [Bool], [Bool], [Bool], RadixCache)
 
-data RadixTree
+data RadixTree database
    = RadixTree
    { _radixBloom :: RadixBloom
    , _radixBloomSize :: Int
@@ -155,6 +167,6 @@ data RadixTree
    , _radixCache :: RadixCache
    , _radixCacheSize :: Int
    , _radixCheckpoint :: RadixRoot
-   , _radixDatabase :: RadixDatabase
+   , _radixDatabase :: database
    , _radixRoot :: RadixRoot
    }

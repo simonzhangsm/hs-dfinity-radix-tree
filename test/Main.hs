@@ -10,7 +10,7 @@ module Main where
 
 import Control.Monad (foldM_, mzero)
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Trans.Resource (runResourceT)
+import Control.Monad.Trans.Resource (MonadResource, runResourceT)
 import Data.Aeson (FromJSON(..), Object, Value(..), eitherDecode)
 import Data.ByteString.Base16 (decode, encode)
 import Data.ByteString.Char8 (ByteString, unpack)
@@ -20,19 +20,20 @@ import Data.Default.Class (Default(..))
 import Data.HashMap.Strict as Map (elems, lookup)
 import Data.Text as Text (Text, drop)
 import Data.Text.Encoding (encodeUtf8)
+import Database.LevelDB (DB, Options(..))
 import System.Console.CmdArgs (Data, cmdArgs)
 
 import Network.DFINITY.RadixTree
 
 data Args
    = Args
-   { database :: FilePath
-   , file :: FilePath
+   { json :: FilePath
+   , path :: FilePath
    , test :: String
    } deriving Data
 
 instance Default Args where
-   def = Args "test/testdb" "test/tests.json" "*"
+   def = Args "test/tests.json" "test/testdb" "*"
 
 data Op
    = Insert ByteString ByteString
@@ -53,7 +54,9 @@ instance Show Op where
       Merkleize value -> "Merkleize" ++ pretty value
       where pretty = mappend " 0x" . unpack . encode
 
-parse :: Object -> Maybe Op
+parse
+   :: Object
+   -> Maybe Op
 parse object = do
    op <- Map.lookup "op" object
    case op of
@@ -63,14 +66,21 @@ parse object = do
       "stateRoot" -> Merkleize <$> get "value" object
       _ -> Nothing
 
-get :: Text -> Object -> Maybe ByteString
+get
+   :: Text
+   -> Object
+   -> Maybe ByteString
 get key object = do
    value <- Map.lookup key object
    case value of
       String text -> Just $ fst $ decode $ encodeUtf8 $ Text.drop 2 text
       _ -> Nothing
 
-step :: MonadIO m => RadixTree -> Op -> m RadixTree
+step
+   :: MonadResource m
+   => RadixTree DB
+   -> Op
+   -> m (RadixTree DB)
 step tree op = do
    liftIO $ print op
    case op of
@@ -109,11 +119,12 @@ step tree op = do
 main :: IO ()
 main = do
    Args {..} <- cmdArgs def
-   contents <- Lazy.readFile file
+   contents <- Lazy.readFile json
    case eitherDecode contents of
       Left err -> fail err
       Right vctors -> runResourceT $ do
-         tree <- createRadixTree 100 100 database Nothing
+         let options = def {createIfMissing = True}
+         tree <- createRadixTree 262144 2048 Nothing (path, options)
          if test == "*"
          then foldM_ step tree `mapM_` elems vctors
          else case Map.lookup test vctors of
