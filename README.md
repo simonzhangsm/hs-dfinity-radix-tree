@@ -72,7 +72,7 @@ lookupMerkleTree
    -> m (Maybe (ByteString, MerkleTree))
 lookupMerkleTree = lookupMerkleizedRadixTree
 ```
-Using the API above, we can perform some basic operations on the database and see that its contents is uniquely defined by its `MerkleRoot`.
+Using the API above, we can perform some basic operations on the tree as a proxy for the database and see that its contents is uniquely defined by its `MerkleRoot`.
 
 ## Contribute
 
