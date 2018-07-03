@@ -36,6 +36,7 @@ Library
       lens-simple,
       leveldb-haskell,
       lrucaching,
+      mtl,
       resourcet,
       semigroups,
       serialise

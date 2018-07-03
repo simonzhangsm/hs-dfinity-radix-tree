@@ -25,6 +25,7 @@ import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
 import Control.DeepSeq (NFData(..))
 import Control.Exception (Exception)
 import Control.Monad (void)
+import Control.Monad.State as State (StateT, get, modify)
 import Control.Monad.Trans.Resource (MonadResource)
 import Crypto.Hash.SHA256 (hash)
 import Data.BloomFilter (Bloom)
@@ -37,10 +38,10 @@ import Data.Data (Data)
 import Data.Default.Class (Default(..))
 import Data.List.NonEmpty (NonEmpty)
 import Data.LruCache (LruCache)
-import Data.Map.Strict (Map)
+import Data.Map.Strict as Map (Map, insert, lookup)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
-import Database.LevelDB (DB, Options, defaultReadOptions, defaultWriteOptions, get, open, put)
+import Database.LevelDB as LevelDB (DB, Options, defaultReadOptions, defaultWriteOptions, get, open, put)
 import Text.Printf (printf)
 
 import Network.DFINITY.RadixTree.Bits
@@ -109,9 +110,14 @@ class Monad m => RadixDatabase config m database | database -> config where
    load :: database -> ByteString -> m (Maybe ByteString)
    store :: database -> ByteString -> ByteString -> m ()
 
+instance Monad m => RadixDatabase () (StateT (Map ByteString ByteString) m) () where
+   create _ = pure ()
+   load _ key = Map.lookup key <$> State.get
+   store _ key value = modify $ insert key value
+
 instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
    create = uncurry open
-   load database = get database defaultReadOptions
+   load database = LevelDB.get database defaultReadOptions
    store database = put database defaultWriteOptions
 
 data RadixError
