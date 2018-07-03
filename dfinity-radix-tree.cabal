@@ -1,18 +1,27 @@
-name:          dfinity-radix-tree
-version:       0.1.0
-synopsis:      A generic data integrity layer.
-homepage:      https://github.com/dfinity-lab/hs-radix-tree
-license:       GPL-3
-license-file:  LICENSE
-author:        Enzo Haussecker <enzo@dfinity.org>
-maintainer:    DFINITY USA Research <team@dfinity.org>
-copyright:     2018 DFINITY Stiftung
-category:      Blockchain, DFINITY, Database
-build-type:    Simple
-cabal-version: >=1.10
+Name:               dfinity-radix-tree
+Version:            0.1.0
+Synopsis:           A generic data integrity layer.
+Description:
+   This library allows you to construct a Merkle tree on top of any underlying
+   key–value database. It works by organizing your key–value pairs into a binary
+   radix tree, which is well suited for storing large dictionaries of fairly
+   random keys, and is optimized for storing keys of the same length.
 
-library
-   build-depends:
+License:            GPL-3
+License-File:       LICENSE
+Category:           Blockchain, DFINITY, Database
+Copyright:          2018 DFINITY Stiftung
+Author:             Enzo Haussecker <enzo@dfinity.org>
+Maintainer:         DFINITY USA Research <team@dfinity.org>
+Homepage:           https://github.com/dfinity-lab/hs-radix-tree
+Bug-Reports:        https://github.com/dfinity-lab/hs-radix-tree/issues
+Tested-With:        GHC==8.4.3, GHC==8.2.2
+Build-Type:         Simple
+Cabal-Version:      >= 1.10
+Extra-Source-Files: CHANGELOG.md README.md
+
+Library
+   Build-Depends:
       BoundedChan,
       base >=4.10 && <5,
       base16-bytestring,
@@ -30,17 +39,17 @@ library
       resourcet,
       semigroups,
       serialise
-   default-language:
+   Default-Language:
       Haskell2010
-   exposed-modules:
+   Exposed-Modules:
       Network.DFINITY.RadixTree
-   ghc-options:
+   GHC-Options:
       -O2
       -Wall
       -fno-warn-missing-signatures
-   hs-source-dirs:
+   HS-Source-Dirs:
       src
-   other-modules:
+   Other-Modules:
       Network.DFINITY.RadixTree.Bits
       Network.DFINITY.RadixTree.Bloom
       Network.DFINITY.RadixTree.Lenses
@@ -49,8 +58,8 @@ library
       Network.DFINITY.RadixTree.Types
       Network.DFINITY.RadixTree.Utilities
 
-executable dfinity-radix-tree-unit-tests
-   build-depends:
+Executable dfinity-radix-tree-unit-tests
+   Build-Depends:
       aeson,
       base >=4.10 && <5,
       base16-bytestring,
@@ -62,18 +71,18 @@ executable dfinity-radix-tree-unit-tests
       resourcet,
       text,
       unordered-containers
-   default-language:
+   Default-Language:
       Haskell2010
-   ghc-options:
+   GHC-Options:
       -O2
       -Wall
-   hs-source-dirs:
+   HS-Source-Dirs:
       test
-   main-is:
+   Main-Is:
       Main.hs
 
-executable dfinity-radix-tree-benchmarks
-   build-depends:
+Executable dfinity-radix-tree-benchmarks
+   Build-Depends:
       base >=4.10 && <5,
       bytestring,
       cmdargs,
@@ -82,13 +91,13 @@ executable dfinity-radix-tree-benchmarks
       dfinity-radix-tree,
       leveldb-haskell,
       resourcet
-   default-language:
+   Default-Language:
       Haskell2010
-   ghc-options:
+   GHC-Options:
       -O2
       -Wall
       -rtsopts
-   hs-source-dirs:
+   HS-Source-Dirs:
       benchmark
-   main-is:
+   Main-Is:
       Main.hs

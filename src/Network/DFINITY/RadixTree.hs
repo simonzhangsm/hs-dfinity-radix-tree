@@ -12,7 +12,7 @@
 -- Maintainer : Enzo Haussecker <enzo@dfinity.org>
 -- Stability  : Stable
 --
--- A Merkleized key–value data store.
+-- A generic data integrity layer.
 module Network.DFINITY.RadixTree (
 
    -- ** Class
