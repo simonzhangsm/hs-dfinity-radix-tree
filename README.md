@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ## Overview
-This library allows you to construct a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) on top of any underlying key–value database.
+This library allows you to construct a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) on top of any underlying key–value database. It works by organizing your key–value pairs into a binary radix tree, which is well suited for storing large dictionaries of fairly random keys, and is optimized for storing keys of the same length.
 
 ## Usage
 Define your database as an instance of the `RadixDatabase` type class. An instance for [LevelDB](http://hackage.haskell.org/package/leveldb-haskell) is already provided.
@@ -72,7 +72,7 @@ lookupMerkleTree
    -> m (Maybe (ByteString, MerkleTree))
 lookupMerkleTree = lookupMerkleizedRadixTree
 ```
-Using the API above, we can perform some basic operations on the tree as a proxy for the database and see that its contents is uniquely defined by its `MerkleRoot`.
+Using the API above, we can perform operations on the tree as a proxy for the database and see that its contents is uniquely defined by its `MerkleRoot`.
 
 ## Contribute
 
