@@ -66,10 +66,10 @@ Executable dfinity-radix-tree-unit-tests
       base16-bytestring,
       bytestring,
       cmdargs,
+      containers,
       data-default-class,
       dfinity-radix-tree,
-      leveldb-haskell,
-      resourcet,
+      mtl,
       text,
       unordered-containers
    Default-Language:
