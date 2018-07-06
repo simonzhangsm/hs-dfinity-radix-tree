@@ -25,16 +25,16 @@ loadHot
    -> RadixBuffer
    -> RadixCache
    -> database
-   -> m (Maybe (RadixBranch, RadixCache))
+   -> m (Maybe (RadixNode, RadixCache))
 {-# SPECIALISE loadHot
    :: RadixRoot
    -> RadixBuffer
    -> RadixCache
    -> DB
-   -> ResourceT IO (Maybe (RadixBranch, RadixCache)) #-}
+   -> ResourceT IO (Maybe (RadixNode, RadixCache)) #-}
 loadHot root buffer cache database =
    case Map.lookup root buffer of
-      Just branch -> pure $ Just (branch, cache)
+      Just node -> pure $ Just (node, cache)
       Nothing -> loadCold root cache database
 
 loadCold
@@ -42,49 +42,49 @@ loadCold
    => RadixRoot
    -> RadixCache
    -> database
-   -> m (Maybe (RadixBranch, RadixCache))
+   -> m (Maybe (RadixNode, RadixCache))
 {-# SPECIALISE loadCold
    :: RadixRoot
    -> RadixCache
    -> DB
-   -> ResourceT IO (Maybe (RadixBranch, RadixCache)) #-}
+   -> ResourceT IO (Maybe (RadixNode, RadixCache)) #-}
 loadCold root cache database =
    case LRU.lookup root cache of
-      Just (branch, cache') ->
-         seq cache' $ seq branch $ pure $ Just (branch, cache')
+      Just (node, cache') ->
+         seq cache' $ seq node $ pure $ Just (node, cache')
       Nothing -> do
          let key = fromShort root
          result <- load database key
          case result of
             Just bytes -> do
-               let branch = deserialise $ fromStrict bytes
-               let cache' = LRU.insert root branch cache
-               seq cache' $ seq branch $ pure $ Just (branch, cache')
+               let node = deserialise $ fromStrict bytes
+               let cache' = LRU.insert root node cache
+               seq cache' $ seq node $ pure $ Just (node, cache')
             Nothing -> pure $ Nothing
 
 storeHot
    :: RadixRoot
-   -> RadixBranch
+   -> RadixNode
    -> RadixBuffer
    -> RadixBuffer
 storeHot = Map.insert
 
 storeCold
    :: RadixDatabase config m database
-   => RadixBranch
+   => RadixNode
    -> RadixCache
    -> database
    -> m (RadixRoot, RadixCache)
 {-# SPECIALISE storeCold
-   :: RadixBranch
+   :: RadixNode
    -> RadixCache
    -> DB
    -> ResourceT IO (RadixRoot, RadixCache) #-}
-storeCold branch cache database = do
+storeCold node cache database = do
    store database key bytes
    seq cache' $ pure (root, cache')
    where
-   bytes = toStrict $ serialise branch
+   bytes = toStrict $ serialise node
    key = Byte.take 20 $ hash bytes
    root = toShort key
-   cache' = LRU.insert root branch cache
+   cache' = LRU.insert root node cache

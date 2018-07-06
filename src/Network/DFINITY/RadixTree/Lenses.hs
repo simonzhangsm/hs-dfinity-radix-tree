@@ -35,25 +35,25 @@ import Lens.Simple (makeLenses, set, view)
 
 import Network.DFINITY.RadixTree.Types
 
-makeLenses ''RadixBranch
+makeLenses ''RadixNode
 makeLenses ''RadixTree
 
-getPrefix :: RadixBranch -> Maybe RadixPrefix
+getPrefix :: RadixNode -> Maybe RadixPrefix
 getPrefix = view radixPrefix
 
-getLeft :: RadixBranch -> Maybe RadixRoot
+getLeft :: RadixNode -> Maybe RadixRoot
 getLeft = view radixLeft
 
-getRight :: RadixBranch -> Maybe RadixRoot
+getRight :: RadixNode -> Maybe RadixRoot
 getRight = view radixRight
 
-getChild :: Bool -> RadixBranch -> Maybe RadixRoot
+getChild :: Bool -> RadixNode -> Maybe RadixRoot
 getChild = bool getLeft getRight
 
-getChildren :: RadixBranch -> (Maybe RadixRoot, Maybe RadixRoot)
-getChildren branch = (getLeft branch, getRight branch)
+getChildren :: RadixNode -> (Maybe RadixRoot, Maybe RadixRoot)
+getChildren node = (getLeft node, getRight node)
 
-getLeaf :: RadixBranch -> Maybe ByteString
+getLeaf :: RadixNode -> Maybe ByteString
 getLeaf = view radixLeaf
 
 getBloom :: RadixTree database -> RadixBloom
@@ -71,22 +71,22 @@ getCheckpoint = view radixCheckpoint
 getRoot :: RadixTree database -> RadixRoot
 getRoot = view radixRoot
 
-setPrefix :: Maybe RadixPrefix -> RadixBranch -> RadixBranch
+setPrefix :: Maybe RadixPrefix -> RadixNode -> RadixNode
 setPrefix = set radixPrefix
 
-setLeft :: Maybe RadixRoot -> RadixBranch -> RadixBranch
+setLeft :: Maybe RadixRoot -> RadixNode -> RadixNode
 setLeft = set radixLeft
 
-setRight :: Maybe RadixRoot -> RadixBranch -> RadixBranch
+setRight :: Maybe RadixRoot -> RadixNode -> RadixNode
 setRight = set radixRight
 
-setChild :: Bool -> Maybe RadixRoot -> RadixBranch -> RadixBranch
+setChild :: Bool -> Maybe RadixRoot -> RadixNode -> RadixNode
 setChild = bool setLeft setRight
 
-setChildren :: (Maybe RadixRoot, Maybe RadixRoot) -> RadixBranch -> RadixBranch
+setChildren :: (Maybe RadixRoot, Maybe RadixRoot) -> RadixNode -> RadixNode
 setChildren (left, right) = setLeft left . setRight right
 
-setLeaf :: Maybe ByteString -> RadixBranch -> RadixBranch
+setLeaf :: Maybe ByteString -> RadixNode -> RadixNode
 setLeaf = set radixLeaf
 
 setBloom :: RadixBloom -> RadixTree database -> RadixTree database

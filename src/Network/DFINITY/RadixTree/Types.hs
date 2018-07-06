@@ -8,11 +8,12 @@
 
 module Network.DFINITY.RadixTree.Types
    ( RadixBloom
-   , RadixBranch(..)
+   , RadixBranch
    , RadixBuffer
    , RadixCache
    , RadixDatabase(..)
    , RadixError(..)
+   , RadixNode(..)
    , RadixPrefix(..)
    , RadixRoot
    , RadixSearchResult
@@ -49,27 +50,55 @@ import Network.DFINITY.RadixTree.Serialise
 
 type RadixBloom = Bloom RadixRoot
 
-data RadixBranch
-   = RadixBranch
+type RadixBranch = [RadixNode]
+
+type RadixBuffer = Map RadixRoot RadixNode
+
+type RadixCache = LruCache RadixRoot RadixNode
+
+class Monad m => RadixDatabase config m database | database -> config where
+   create :: config -> m database
+   load :: database -> ByteString -> m (Maybe ByteString)
+   store :: database -> ByteString -> ByteString -> m ()
+
+instance Monad m => RadixDatabase () (StateT (Map ByteString ByteString) m) () where
+   create = pure
+   load _ key = Map.lookup key <$> State.get
+   store _ key = modify . insert key
+
+instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
+   create = uncurry open
+   load database = LevelDB.get database defaultReadOptions
+   store database = put database defaultWriteOptions
+
+data RadixError
+   = InvalidArgument String
+   | StateRootDoesNotExist RadixRoot
+     deriving (Data, Eq, Show)
+
+instance Exception RadixError
+
+data RadixNode
+   = RadixNode
    { _radixPrefix :: Maybe RadixPrefix
    , _radixLeft :: Maybe RadixRoot
    , _radixRight :: Maybe RadixRoot
    , _radixLeaf :: Maybe ByteString
    } deriving (Data, Eq)
 
-instance NFData RadixBranch where
-   rnf RadixBranch {..} =
+instance NFData RadixNode where
+   rnf RadixNode {..} =
       rnf _radixPrefix `seq`
       rnf _radixLeft `seq`
       rnf _radixRight `seq`
       rnf _radixLeaf `seq`
       ()
 
-instance Default RadixBranch where
-   def = RadixBranch Nothing Nothing Nothing Nothing
+instance Default RadixNode where
+   def = RadixNode Nothing Nothing Nothing Nothing
 
-instance Serialise RadixBranch where
-   encode RadixBranch {..} =
+instance Serialise RadixNode where
+   encode RadixNode {..} =
       encodeListLen len <>
       encodeMaybe CBOR.encode _radixPrefix <>
       encodeMaybe encodeSide left <>
@@ -85,10 +114,10 @@ instance Serialise RadixBranch where
       left <- decodeMaybe $ toShort <$> decodeSide
       right <- decodeMaybe $ toShort <$> decodeSide
       leaf <- decodeLeaf len
-      pure $ RadixBranch prefix left right leaf
+      pure $ RadixNode prefix left right leaf
 
-instance Show RadixBranch where
-   show branch@RadixBranch {..} =
+instance Show RadixNode where
+   show node@RadixNode {..} =
       case color 7 . unpack <$> _radixLeaf of
          Nothing -> printf "%s@[%s,%s,%s]" root prefix left right
          Just leaf -> printf "%s@[%s,%s,%s,%s]" root prefix left right leaf
@@ -96,36 +125,10 @@ instance Show RadixBranch where
       color :: Int -> String -> String
       color = printf "\ESC[9%dm%s\ESC[0m"
       format = take 8 . unpack . Base16.encode
-      root = color 4 $ format $ hash $ toStrict $ serialise branch
+      root = color 4 $ format $ hash $ toStrict $ serialise node
       prefix = color 7 $ maybe "null" show _radixPrefix
       left = color 4 $ maybe "null" format $ fromShort <$> _radixLeft
       right = color 4 $ maybe "null" format $ fromShort <$> _radixRight
-
-type RadixBuffer = Map RadixRoot RadixBranch
-
-type RadixCache = LruCache RadixRoot RadixBranch
-
-class Monad m => RadixDatabase config m database | database -> config where
-   create :: config -> m database
-   load :: database -> ByteString -> m (Maybe ByteString)
-   store :: database -> ByteString -> ByteString -> m ()
-
-instance Monad m => RadixDatabase () (StateT (Map ByteString ByteString) m) () where
-   create _ = pure ()
-   load _ key = Map.lookup key <$> State.get
-   store _ key value = modify $ insert key value
-
-instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
-   create = uncurry open
-   load database = LevelDB.get database defaultReadOptions
-   store database = put database defaultWriteOptions
-
-data RadixError
-   = InvalidArgument String
-   | StateRootDoesNotExist RadixRoot
-     deriving (Data, Eq, Show)
-
-instance Exception RadixError
 
 data RadixPrefix
    = RadixPrefix
@@ -163,7 +166,7 @@ instance Show RadixPrefix where
 
 type RadixRoot = ShortByteString
 
-type RadixSearchResult = (NonEmpty RadixRoot, NonEmpty RadixBranch, NonEmpty [Bool], [Bool], [Bool], RadixCache)
+type RadixSearchResult = (NonEmpty RadixRoot, NonEmpty RadixNode, NonEmpty [Bool], [Bool], [Bool], RadixCache)
 
 data RadixTree database
    = RadixTree

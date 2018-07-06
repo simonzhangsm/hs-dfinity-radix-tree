@@ -21,7 +21,7 @@ createPrefix bits =
    then Nothing
    else Just $ fromBits bits
 
-createRoot :: RadixBranch -> RadixRoot
+createRoot :: RadixNode -> RadixRoot
 createRoot = toShort . Byte.take 20 . hashlazy . serialise
 
 defaultRoot :: RadixRoot
