@@ -19,9 +19,7 @@ module Network.DFINITY.RadixTree (
      RadixDatabase(..)
 
    -- ** Types
-   , RadixBranch
    , RadixError(..)
-   , RadixNode(..)
    , RadixRoot
    , RadixTree
 
