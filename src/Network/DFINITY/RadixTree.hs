@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS -Wall #-}
 {-# OPTIONS -Werror=incomplete-patterns #-}
@@ -49,6 +50,8 @@ module Network.DFINITY.RadixTree (
    , sinkMerkleizedRadixTree
 
    -- ** Debug
+   , contentsMerkleizedRadixTree
+   , contentsNonMerkleizedRadixTree
    , printMerkleizedRadixTree
    , printNonMerkleizedRadixTree
 
@@ -739,6 +742,64 @@ sinkMerkleizedRadixTree checkpoint chan tree@RadixTree {..} =
                   let buffer'' = Map.insert root' (key', bytes', children') buffer'
                   liftIO $ void $ tryWriteChan chan root
                   loop3 buffer'' want' candidates
+
+-- |
+-- Get the contents of a radix tree.
+contentsRadixTree
+   :: RadixDatabase config m database
+   => Bool -- ^ Overwrite state root?
+   -> (RadixTree database -> m (Maybe (RadixNode, RadixCache))) -- ^ Loading strategy.
+   -> RadixTree database -- ^ Radix tree.
+   -> m [(ByteString, ByteString)]
+{-# SPECIALISE contentsRadixTree
+   :: Bool
+   -> (RadixTree DB -> ResourceT IO (Maybe (RadixNode, RadixCache)))
+   -> RadixTree DB
+   -> ResourceT IO [(ByteString, ByteString)] #-}
+contentsRadixTree flag strategy = \ tree@RadixTree {..} -> do
+   let tree' = tree `bool` setRoot _radixCheckpoint tree $ flag
+   loop tree' [] [] where
+   loop tree@RadixTree {..} prefix accum = do
+      result <- strategy tree
+      case fst <$> result of
+         Nothing -> throw $ StateRootDoesNotExist _radixRoot
+         Just RadixNode {..} -> do
+            let prefix' = prefix ++ maybe [] toBits _radixPrefix
+            let key = fromBits prefix'
+            let accum' = maybe accum (\ value -> (key, value):accum) _radixLeaf
+            let children = [(,False) <$> _radixLeft, (,True) <$> _radixRight]
+            flip foldM accum' `flip` children $ \ accum'' -> \ case
+               Nothing -> pure accum''
+               Just (root, test) -> do
+                  let tree' = setRoot root tree
+                  let prefix'' = prefix' ++ [test]
+                  loop tree' prefix'' accum''
+
+-- |
+-- Get the contents of a Merkleized radix tree.
+contentsMerkleizedRadixTree
+   :: RadixDatabase config m database
+   => RadixTree database -- ^ Radix tree.
+   -> m [(ByteString, ByteString)]
+{-# SPECIALISE contentsMerkleizedRadixTree
+   :: RadixTree DB
+   -> ResourceT IO [(ByteString, ByteString)] #-}
+contentsMerkleizedRadixTree =
+   contentsRadixTree True $ \ RadixTree {..} ->
+      loadCold _radixRoot _radixCache _radixDatabase
+
+-- |
+-- Get the contents of a non-Merkleized radix tree.
+contentsNonMerkleizedRadixTree
+   :: RadixDatabase config m database
+   => RadixTree database -- ^ Radix tree.
+   -> m [(ByteString, ByteString)]
+{-# SPECIALISE contentsNonMerkleizedRadixTree
+   :: RadixTree DB
+   -> ResourceT IO [(ByteString, ByteString)] #-}
+contentsNonMerkleizedRadixTree =
+   contentsRadixTree False $ \ RadixTree {..} ->
+      loadHot _radixRoot _radixBuffer _radixCache _radixDatabase
 
 -- |
 -- Print a radix tree.
