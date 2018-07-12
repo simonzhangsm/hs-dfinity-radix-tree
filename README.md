@@ -61,12 +61,12 @@ main = runResourceT $ do
    tree  <- createRadixTree' "/path/to/database" Nothing
    tree' <- insertRadixTree "Hello" "World" tree
    root  <- fst <$> merkleizeRadixTree tree'
-   liftIO $ putStrLn $ "Merkle Root: 0x" ++ pretty root
+   liftIO $ putStrLn $ "State Root: 0x" ++ pretty root
    where pretty = unpack . encode . fromShort
 ```
 Running the program above should produce the following result.
 ```
-Merkle Root: 0x621f6e4c28b18e58d374c9236daa1a0ccba16550
+State Root: 0x621f6e4c28b18e58d374c9236daa1a0ccba16550
 ```
 
 ## Contribute
