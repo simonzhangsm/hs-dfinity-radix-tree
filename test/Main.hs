@@ -11,7 +11,7 @@ module Main where
 import Control.Arrow (first)
 import Control.Monad (foldM_, mzero, void)
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.State (StateT, runStateT)
+import Control.Monad.State.Strict (StateT, runStateT)
 import Data.Aeson (FromJSON(..), Object, Value(..), eitherDecode)
 import Data.ByteString.Base16 (decode, encode)
 import Data.ByteString.Char8 (ByteString, unpack)
