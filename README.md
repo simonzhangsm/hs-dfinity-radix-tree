@@ -14,19 +14,18 @@ Define your database as an instance of the [`RadixDatabase`](https://hackage.has
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 import Control.Monad.Trans.Resource (MonadResource)
-import Database.LevelDB (DB, Options, defaultReadOptions, defaultWriteOptions, get, open, put)
+import Database.LevelDB (DB, defaultReadOptions, defaultWriteOptions, get, put)
 
 import Network.DFINITY.RadixTree
 
-instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
-   create = uncurry open
+instance MonadResource m => RadixDatabase m DB where
    load database = get database defaultReadOptions
    store database = put database defaultWriteOptions
 ```
 Create a [`RadixTree`](https://hackage.haskell.org/package/dfinity-radix-tree/docs/Network-DFINITY-RadixTree.html#t:RadixTree) that is parameterized by your database. If you want to make things more explicit, then you can define a simple type alias and wrapper function.
 ```haskell
 import Control.Monad.Trans.Resource (MonadResource)
-import Database.LevelDB (DB, Options(..), defaultOptions)
+import Database.LevelDB (DB, Options(..), defaultOptions, open)
 
 import Network.DFINITY.RadixTree
 
@@ -37,8 +36,9 @@ createRadixTree'
    => FilePath -- Database.
    -> Maybe RadixRoot -- State root.
    -> m RadixTree'
-createRadixTree' path root =
-   createRadixTree bloomSize cacheSize root (path, options)
+createRadixTree' file root = do
+   handle <- open file options
+   createRadixTree bloomSize cacheSize root handle
    where
    bloomSize = 262144
    cacheSize = 2048
