@@ -563,10 +563,7 @@ lookupMerkleizedRadixTree
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
-{-# SPECIALISE lookupMerkleizedRadixTree
-   :: ByteString
-   -> RadixTree DB
-   -> ResourceT IO (Maybe (ByteString, RadixTree DB)) #-}
+{-# DEPRECATED lookupMerkleizedRadixTree "The function is will be removed in the next release. Please use 'lookupRadixTree' instead." #-}
 lookupMerkleizedRadixTree = lookupRadixTree' searchMerkleizedRadixTree
 
 -- |
