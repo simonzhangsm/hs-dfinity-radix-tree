@@ -14,18 +14,18 @@ import Data.ByteString.Builder (word32BE, toLazyByteString)
 import Data.ByteString.Char8 (ByteString)
 import Data.Default.Class (Default(..))
 import Data.Word (Word32)
-import Database.LevelDB (DB, Options(..))
+import Database.LevelDB (DB, Options(..), open)
 import System.Console.CmdArgs (Data, cmdArgs)
 
 import Network.DFINITY.RadixTree
 
 data Args
    = Args
-   { path :: FilePath
+   { database :: FilePath
    } deriving Data
 
 instance Default Args where
-   def = Args "benchmark/benchmarkdb"
+   def = Args "database"
 
 step
    :: MonadResource m
@@ -58,8 +58,10 @@ main :: IO ()
 main = do
    Args {..} <- cmdArgs def
    runResourceT $ do
-      let options = def {createIfMissing = True}
-      tree <- createRadixTree 262144 2048 Nothing (path, options)
+      let 
+      handle <- open database options
+      tree <- createRadixTree 262144 2048 Nothing handle
       tree' <- foldInsert tree [1..100000]
       tree'' <- foldDelete tree' [1..100000]
       liftIO $ print $ isEmptyRadixTree tree''
+      where options = def {createIfMissing = True}

@@ -82,7 +82,7 @@ import Data.LruCache as LRU (empty, insert, lookup)
 import Data.Map.Strict as Map ((!), delete, empty, insert, keys, lookup, member, null, singleton)
 import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
 import Data.Tuple (swap)
-import Database.LevelDB (DB, Options)
+import Database.LevelDB (DB)
 
 import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Bloom
@@ -94,23 +94,22 @@ import Network.DFINITY.RadixTree.Utilities
 -- |
 -- Create a radix tree.
 createRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => Int -- ^ Bloom filter size in bits.
    -> Int -- ^ LRU cache size in items.
    -> Maybe RadixRoot -- ^ Previous state root.
-   -> config -- ^ Database configuration.
+   -> database -- ^ Database.
    -> m (RadixTree database)
 {-# SPECIALISE createRadixTree
    :: Int
    -> Int
    -> Maybe RadixRoot
-   -> (FilePath, Options)
+   -> DB
    -> ResourceT IO (RadixTree DB) #-}
-createRadixTree bloomSize cacheSize checkpoint config
+createRadixTree bloomSize cacheSize checkpoint database
    | bloomSize <= 0 = throw $ InvalidArgument "invalid Bloom filter size"
    | cacheSize <= 0 = throw $ InvalidArgument "invalid LRU cache size"
    | otherwise = do
-      database <- create config
       (root, cache') <-
          case checkpoint of
             Nothing -> storeCold def cache database
@@ -127,7 +126,7 @@ createRadixTree bloomSize cacheSize checkpoint config
 -- |
 -- Create a radix tree from a radix tree.
 subtreeRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixRoot -- ^ State root.
    -> RadixTree database -- ^ Radix tree.
    -> m (RadixTree database)
@@ -155,7 +154,7 @@ isEmptyRadixTree = (==) defaultRoot . _radixRoot
 -- |
 -- Check if a state root is valid.
 isValidRadixRoot
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixRoot -- ^ State root.
    -> RadixTree database -- ^ Radix tree.
    -> m Bool
@@ -171,7 +170,7 @@ isValidRadixRoot root RadixTree {..} =
 -- |
 -- Search for a value in a radix tree.
 searchRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => Bool -- ^ Overwrite state root?
    -> (RadixTree database -> m (Maybe (RadixNode, RadixCache))) -- ^ Loading strategy.
    -> ByteString -- ^ Key.
@@ -219,7 +218,7 @@ searchRadixTree flag strategy = \ key tree@RadixTree {..} -> do
 -- |
 -- Search for a value in a Merkleized radix tree.
 searchMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Either RadixError RadixSearchResult)
@@ -234,7 +233,7 @@ searchMerkleizedRadixTree =
 -- |
 -- Search for a value in a non-Merkleized radix tree.
 searchNonMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Either RadixError RadixSearchResult)
@@ -249,7 +248,7 @@ searchNonMerkleizedRadixTree =
 -- |
 -- Insert a key and value into a radix tree.
 insertRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> ByteString -- ^ Value.
    -> RadixTree database -- ^ Radix tree.
@@ -378,7 +377,7 @@ insertRadixTreeBetween (_:|roots, node:|nodes, prefix:|_, prefixOverflow, keyOve
 -- |
 -- Delete a value from a radix tree.
 deleteRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (RadixTree database)
@@ -522,7 +521,7 @@ deleteRadixTreeTwoChildren (_:|roots, node:|nodes, prefix:|_, _, _, cache) tree@
 -- |
 -- Lookup a value in a radix tree.
 lookupRadixTree'
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => (ByteString -> RadixTree database -> m (Either RadixError RadixSearchResult)) -- ^ Search algorithm.
    -> ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
@@ -547,7 +546,7 @@ lookupRadixTree' search key tree = do
 -- |
 -- A convenient alias for `lookupNonMerkleizedRadixTree`.
 lookupRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
@@ -560,7 +559,7 @@ lookupRadixTree = lookupNonMerkleizedRadixTree
 -- |
 -- Lookup a value in a Merkleized radix tree.
 lookupMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
@@ -573,7 +572,7 @@ lookupMerkleizedRadixTree = lookupRadixTree' searchMerkleizedRadixTree
 -- |
 -- Lookup a value in a non-Merkleized radix tree.
 lookupNonMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
@@ -599,7 +598,7 @@ merkleSpoof mask = \ case
 -- |
 -- Merkleize a radix tree. This will flush the buffer to disk.
 merkleizeRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixTree database-- ^ Radix tree.
    -> m (RadixRoot, RadixTree database)
 {-# SPECIALISE merkleizeRadixTree
@@ -645,7 +644,7 @@ merkleizeRadixTree RadixTree {..} = do
 -- Create a conduit from a Merkleized radix tree.
 sourceMerkleizedRadixTree
    :: MonadResource m
-   => RadixDatabase config (ConduitM () ByteString m) database
+   => RadixDatabase (ConduitM () ByteString m) database
    => [Bool] -- ^ Bit mask.
    -> Int -- ^ LRU cache size in items.
    -> BoundedChan RadixRoot -- ^ Terminal state root producer.
@@ -689,7 +688,7 @@ sourceMerkleizedRadixTree mask cacheSize chan
 -- Create a Merkleized radix tree from a conduit.
 sinkMerkleizedRadixTree
    :: MonadResource m
-   => RadixDatabase config (ConduitM ByteString () m) database
+   => RadixDatabase (ConduitM ByteString () m) database
    => RadixRoot -- ^ Target state root.
    -> BoundedChan RadixRoot -- ^ Terminal state root consumer.
    -> RadixTree database -- ^ Radix tree.
@@ -762,7 +761,7 @@ sinkMerkleizedRadixTree checkpoint chan tree@RadixTree {..} =
 -- |
 -- Get the contents of a radix tree.
 contentsRadixTree'
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => Bool -- ^ Overwrite state root?
    -> (RadixTree database -> m (Maybe (RadixNode, RadixCache))) -- ^ Loading strategy.
    -> RadixTree database -- ^ Radix tree.
@@ -794,7 +793,7 @@ contentsRadixTree' flag strategy = \ tree@RadixTree {..} -> do
 -- |
 -- A convenient alias for `contentsNonMerkleizedRadixTree`.
 contentsRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m [(ByteString, ByteString)]
 {-# SPECIALISE contentsRadixTree
@@ -805,7 +804,7 @@ contentsRadixTree = contentsNonMerkleizedRadixTree
 -- |
 -- Get the contents of a Merkleized radix tree.
 contentsMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m [(ByteString, ByteString)]
 {-# SPECIALISE contentsMerkleizedRadixTree
@@ -818,7 +817,7 @@ contentsMerkleizedRadixTree =
 -- |
 -- Get the contents of a non-Merkleized radix tree.
 contentsNonMerkleizedRadixTree
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m [(ByteString, ByteString)]
 {-# SPECIALISE contentsNonMerkleizedRadixTree
@@ -832,7 +831,7 @@ contentsNonMerkleizedRadixTree =
 -- Print a radix tree.
 printRadixTree'
    :: MonadIO m
-   => RadixDatabase config m database
+   => RadixDatabase m database
    => Bool -- ^ Overwrite state root?
    -> (RadixTree database -> m (Maybe (RadixNode, RadixCache))) -- ^ Loading strategy.
    -> RadixTree database -- ^ Radix tree.
@@ -861,7 +860,7 @@ printRadixTree' flag strategy = \ tree@RadixTree {..} -> do
 -- A convenient alias for `printNonMerkleizedRadixTree`.
 printRadixTree
    :: MonadIO m
-   => RadixDatabase config m database
+   => RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m ()
 {-# SPECIALISE printRadixTree
@@ -873,7 +872,7 @@ printRadixTree = printNonMerkleizedRadixTree
 -- Print a Merkleized radix tree.
 printMerkleizedRadixTree
    :: MonadIO m
-   => RadixDatabase config m database
+   => RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m ()
 {-# SPECIALISE printMerkleizedRadixTree
@@ -887,7 +886,7 @@ printMerkleizedRadixTree =
 -- Print a non-Merkleized radix tree.
 printNonMerkleizedRadixTree
    :: MonadIO m
-   => RadixDatabase config m database
+   => RadixDatabase m database
    => RadixTree database -- ^ Radix tree.
    -> m ()
 {-# SPECIALISE printNonMerkleizedRadixTree

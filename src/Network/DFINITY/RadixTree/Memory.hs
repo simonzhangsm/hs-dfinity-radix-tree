@@ -20,7 +20,7 @@ import Database.LevelDB (DB)
 import Network.DFINITY.RadixTree.Types
 
 loadHot
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixRoot
    -> RadixBuffer
    -> RadixCache
@@ -38,7 +38,7 @@ loadHot root buffer cache database =
       Nothing -> loadCold root cache database
 
 loadCold
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixRoot
    -> RadixCache
    -> database
@@ -70,7 +70,7 @@ storeHot
 storeHot = Map.insert
 
 storeCold
-   :: RadixDatabase config m database
+   :: RadixDatabase m database
    => RadixNode
    -> RadixCache
    -> database

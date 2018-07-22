@@ -1,6 +1,6 @@
 *.hp
 *.ps
 *.svg
+database*
 dist*
-benchmark/benchmarkdb*
 test/testdb*

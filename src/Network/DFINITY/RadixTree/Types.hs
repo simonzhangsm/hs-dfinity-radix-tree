@@ -42,7 +42,7 @@ import Data.LruCache (LruCache)
 import Data.Map.Strict as Map (Map, insert, lookup)
 import Data.Maybe (isJust)
 import Data.Monoid ((<>))
-import Database.LevelDB as LevelDB (DB, Options, defaultReadOptions, defaultWriteOptions, get, open, put)
+import Database.LevelDB as LevelDB (DB, defaultReadOptions, defaultWriteOptions, get, put)
 import Text.Printf (printf)
 
 import Network.DFINITY.RadixTree.Bits
@@ -56,18 +56,15 @@ type RadixBuffer = Map RadixRoot RadixNode
 
 type RadixCache = LruCache RadixRoot RadixNode
 
-class Monad m => RadixDatabase config m database | database -> config where
-   create :: config -> m database
+class Monad m => RadixDatabase m database where
    load :: database -> ByteString -> m (Maybe ByteString)
    store :: database -> ByteString -> ByteString -> m ()
 
-instance Monad m => RadixDatabase () (StateT (Map ByteString ByteString) m) () where
-   create = pure
+instance Monad m => RadixDatabase (StateT (Map ByteString ByteString) m) () where
    load _ key = Map.lookup key <$> State.get
    store _ key = modify . insert key
 
-instance MonadResource m => RadixDatabase (FilePath, Options) m DB where
-   create = uncurry open
+instance MonadResource m => RadixDatabase m DB where
    load database = LevelDB.get database defaultReadOptions
    store database = put database defaultWriteOptions
 
