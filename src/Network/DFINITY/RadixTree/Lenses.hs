@@ -15,6 +15,7 @@ module Network.DFINITY.RadixTree.Lenses
    , getBuffer
    , getCache
    , getCheckpoint
+   , getNonce
    , getRoot
    , setPrefix
    , setLeft
@@ -26,6 +27,7 @@ module Network.DFINITY.RadixTree.Lenses
    , setBuffer
    , setCache
    , setCheckpoint
+   , setNonce
    , setRoot
    ) where
 
@@ -68,6 +70,9 @@ getCache = view radixCache
 getCheckpoint :: RadixTree database -> RadixRoot
 getCheckpoint = view radixCheckpoint
 
+getNonce :: RadixTree database -> Word
+getNonce = view radixNonce
+
 getRoot :: RadixTree database -> RadixRoot
 getRoot = view radixRoot
 
@@ -100,6 +105,9 @@ setCache = set radixCache
 
 setCheckpoint :: RadixRoot -> RadixTree database -> RadixTree database
 setCheckpoint = set radixCheckpoint
+
+setNonce :: Word -> RadixTree database -> RadixTree database
+setNonce = set radixNonce
 
 setRoot :: RadixRoot -> RadixTree database -> RadixTree database
 setRoot = set radixRoot

@@ -115,17 +115,16 @@ instance Serialise RadixNode where
 
 instance Show RadixNode where
    show node@RadixNode {..} =
-      case color 7 . unpack <$> _radixLeaf of
-         Nothing -> printf "%s@[%s,%s,%s]" root prefix left right
-         Just leaf -> printf "%s@[%s,%s,%s,%s]" root prefix left right leaf
+      case unpack <$> _radixLeaf of
+         Nothing -> printf "\ESC[96m%s\ESC[0m@[\ESC[97m%s\ESC[0m,\ESC[96m%s\ESC[0m,\ESC[96m%s\ESC[0m]" root prefix left right
+         Just leaf -> printf "\ESC[96m%s\ESC[0m@[\ESC[97m%s\ESC[0m,\ESC[96m%s\ESC[0m,\ESC[96m%s\ESC[0m,\ESC[97m%s\ESC[0m]" root prefix left right leaf
       where
-      color :: Int -> String -> String
-      color = printf "\ESC[9%dm%s\ESC[0m"
+      root = format $ hash $ toStrict $ serialise node
+      prefix = guard show _radixPrefix
+      left = guard format $ fromShort <$> _radixLeft
+      right = guard format $ fromShort <$> _radixRight
+      guard = maybe "null"
       format = take 8 . unpack . Base16.encode
-      root = color 4 $ format $ hash $ toStrict $ serialise node
-      prefix = color 7 $ maybe "null" show _radixPrefix
-      left = color 4 $ maybe "null" format $ fromShort <$> _radixLeft
-      right = color 4 $ maybe "null" format $ fromShort <$> _radixRight
 
 data RadixPrefix
    = RadixPrefix
@@ -174,5 +173,6 @@ data RadixTree database
    , _radixCacheSize :: Int
    , _radixCheckpoint :: RadixRoot
    , _radixDatabase :: database
+   , _radixNonce :: Word
    , _radixRoot :: RadixRoot
    }

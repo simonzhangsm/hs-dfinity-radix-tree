@@ -118,7 +118,7 @@ createRadixTree bloomSize cacheSize checkpoint database
                case snd <$> result of
                   Nothing -> throw $ StateRootDoesNotExist root
                   Just cache' -> pure (root, cache')
-      pure $ RadixTree bloom bloomSize Map.empty cache' cacheSize root database root
+      pure $ RadixTree bloom bloomSize Map.empty cache' cacheSize root database 0 root
       where
       bloom = emptyRadixBloom bloomSize
       cache = LRU.empty cacheSize
@@ -138,7 +138,7 @@ subtreeRadixTree root RadixTree {..} = do
    result <- loadCold root cache _radixDatabase
    case result of
       Nothing -> throw $ StateRootDoesNotExist root
-      _ -> pure $ RadixTree bloom _radixBloomSize Map.empty cache _radixCacheSize root _radixDatabase root
+      _ -> pure $ RadixTree bloom _radixBloomSize Map.empty cache _radixCacheSize root _radixDatabase 0 root
       where
       bloom = emptyRadixBloom _radixBloomSize
       cache = LRU.empty _radixCacheSize
@@ -280,12 +280,13 @@ initializeRadixTree
    -> RadixTree database
 {-# INLINABLE initializeRadixTree #-}
 initializeRadixTree key value tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setRoot root tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setNonce nonce $ setRoot root tree
    where
    prefix = createPrefix $ toBits key
    node = setPrefix prefix $ Just value `setLeaf` def
-   root = createRoot node
+   root = createRootFromNonce _radixNonce
    bloom = Bloom.insert root _radixBloom
+   nonce = _radixNonce + 1
    buffer = storeHot root node _radixBuffer
 
 -- TODO (enzo): Documentation.
@@ -296,13 +297,14 @@ insertRadixTreeAt
    -> RadixTree database
 {-# INLINABLE insertRadixTreeAt #-}
 insertRadixTreeAt (_:|roots, node:|nodes, prefix:|_, _, _, cache) value tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    node' = Just value `setLeaf` node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 1
    state = bool _radixRoot root' $ isNothing parent
 
 -- TODO (enzo): Documentation.
@@ -313,17 +315,18 @@ insertRadixTreeAfter
    -> RadixTree database
 {-# INLINABLE insertRadixTreeAfter #-}
 insertRadixTreeAfter (_:|roots, node:|nodes, prefix:|_, _, keyOverflow, cache) value tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    prefix' = createPrefix $ drop 1 keyOverflow
    node' = setPrefix prefix' $ Just value `setLeaf` def
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    node'' = test `setChild` Just root' $ node
-   root'' = createRoot node''
+   root'' = createRootFromNonce $ _radixNonce + 1
    test = head keyOverflow
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root'':root':roots
    buffer = merkleSpoof root'' parent $ storeHot root'' node'' $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 2
    state = bool _radixRoot root'' $ isNothing parent
 
 -- TODO (enzo): Documentation.
@@ -334,18 +337,19 @@ insertRadixTreeBefore
    -> RadixTree database
 {-# INLINABLE insertRadixTreeBefore #-}
 insertRadixTreeBefore (_:|roots, node:|nodes, prefix:|_, prefixOverflow, _, cache) value tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    prefix' = createPrefix $ drop 1 prefixOverflow
    node' = setPrefix prefix' node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    prefix'' = createPrefix $ drop 1 prefix `bool` prefix $ isNothing parent
    node'' = setPrefix prefix'' $ test `setChild` Just root' $ Just value `setLeaf` def
-   root'' = createRoot node''
+   root'' = createRootFromNonce $ _radixNonce + 1
    test = head prefixOverflow
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root'':root':roots
    buffer = merkleSpoof root'' parent $ storeHot root'' node'' $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 2
    state = bool _radixRoot root'' $ isNothing parent
 
 -- TODO (enzo): Documentation.
@@ -356,22 +360,23 @@ insertRadixTreeBetween
    -> RadixTree database
 {-# INLINABLE insertRadixTreeBetween #-}
 insertRadixTreeBetween (_:|roots, node:|nodes, prefix:|_, prefixOverflow, keyOverflow, cache) value tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    prefix' = createPrefix $ drop 1 keyOverflow
    node' = setPrefix prefix' $ Just value `setLeaf` def
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    prefix'' = createPrefix $ drop 1 prefixOverflow
    node'' = setPrefix prefix'' node
-   root'' = createRoot node''
+   root'' = createRootFromNonce $ _radixNonce + 1
    prefix''' = createPrefix $ drop 1 prefix `bool` prefix $ isNothing parent
    node''' = setPrefix prefix''' $ setChildren children def
-   root''' = createRoot node'''
+   root''' = createRootFromNonce $ _radixNonce + 2
    test = head keyOverflow
    children = bool id swap test (Just root', Just root'')
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root''':root'':root':roots
    buffer = merkleSpoof root''' parent $ storeHot root''' node''' $ storeHot root'' node'' $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 3
    state = bool _radixRoot root''' $ isNothing parent
 
 -- |
@@ -446,14 +451,15 @@ deleteRadixTreeNoChildrenParentWithLeaf
    -> RadixTree database
 {-# INLINABLE deleteRadixTreeNoChildrenParentWithLeaf #-}
 deleteRadixTreeNoChildrenParentWithLeaf (_:|_:roots, _:|node:nodes, prefix:|prefixes, _, _, cache) tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    node' = setChild test Nothing node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    test = head prefix
    parent = listToMaybe $ zip3 roots nodes $ map head prefixes
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 1
    state = bool _radixRoot root' $ isNothing parent
 deleteRadixTreeNoChildrenParentWithLeaf _ _ =
    throw $ InvalidArgument "unknown parent"
@@ -468,15 +474,16 @@ deleteRadixTreeNoChildrenParentWithoutLeaf
    -> RadixTree database
 {-# INLINABLE deleteRadixTreeNoChildrenParentWithoutLeaf #-}
 deleteRadixTreeNoChildrenParentWithoutLeaf (_:|_:roots, _:|_:nodes, _:|prefixes, _, _, _) node@RadixNode {..} cache test tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    prefix' = createPrefix $ drop 1 bits `bool` bits $ isNothing parent
    node' = setPrefix prefix' node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    bits = head prefixes ++ test:maybe [] toBits _radixPrefix
    parent = listToMaybe $ zip3 roots nodes $ map head prefixes
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 1
    state = bool _radixRoot root' $ isNothing parent
 deleteRadixTreeNoChildrenParentWithoutLeaf _ _ _ _ _ =
    throw $ InvalidArgument "unknown parent"
@@ -491,15 +498,16 @@ deleteRadixTreeOneChild
    -> RadixTree database
 {-# INLINABLE deleteRadixTreeOneChild #-}
 deleteRadixTreeOneChild (_:|roots, _:|nodes, prefix:|_, _, _, _) node@RadixNode {..} cache test tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    prefix' = createPrefix $ drop 1 bits `bool` bits $ isNothing parent
    node' = setPrefix prefix' node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    bits = prefix ++ test:maybe [] toBits _radixPrefix
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 1
    state = bool _radixRoot root' $ isNothing parent
 
 -- TODO (enzo): Documentation.
@@ -509,13 +517,14 @@ deleteRadixTreeTwoChildren
    -> RadixTree database
 {-# INLINABLE deleteRadixTreeTwoChildren #-}
 deleteRadixTreeTwoChildren (_:|roots, node:|nodes, prefix:|_, _, _, cache) tree@RadixTree {..} =
-   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
+   seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setNonce nonce $ setRoot state tree
    where
    node' = setLeaf Nothing node
-   root' = createRoot node'
+   root' = createRootFromNonce _radixNonce
    parent = listToMaybe $ zip3 roots nodes prefix
    bloom = flip insertList _radixBloom $ root':roots
    buffer = merkleSpoof root' parent $ storeHot root' node' _radixBuffer
+   nonce = _radixNonce + 1
    state = bool _radixRoot root' $ isNothing parent
 
 -- |
@@ -603,7 +612,7 @@ merkleizeRadixTree
    -> ResourceT IO (RadixRoot, RadixTree DB) #-}
 merkleizeRadixTree RadixTree {..} = do
    (root, cache) <- loop _radixRoot _radixCache
-   let tree = RadixTree bloom _radixBloomSize Map.empty cache _radixCacheSize root _radixDatabase root
+   let tree = RadixTree bloom _radixBloomSize Map.empty cache _radixCacheSize root _radixDatabase 0 root
    pure (root, tree)
    where
    bloom = emptyRadixBloom _radixBloomSize
