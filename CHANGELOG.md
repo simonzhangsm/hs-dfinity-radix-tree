@@ -1,3 +1,7 @@
+0.2.1 Enzo Haussecker <enzo@dfinity.org> Wed Jul 25 2018
+
+ * Fix bug related to temporary reference creation
+
 0.2.0 Enzo Haussecker <enzo@dfinity.org> Sat Jul 21 2018
 
  * Remove config parameter from type class
@@ -12,4 +16,4 @@
 
  * Abstract database to type class
  * Implement radix tree construction via conduit
- * Clean-up documentation
+ * Clean-up documentationtemporary references
