@@ -84,7 +84,7 @@ step tree op = do
          printNonMerkleizedRadixTree tree'
          pure tree'
       Lookup key value -> do
-         result <- lookupNonMerkleizedRadixTree key tree
+         result <- lookupRadixTree key tree
          case result of
             Just (value', tree') | value == value' -> pure tree'
             Just (value', _) -> throw

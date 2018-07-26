@@ -130,10 +130,7 @@ subtreeRadixTree
    => RadixRoot -- ^ State root.
    -> RadixTree database -- ^ Radix tree.
    -> m (RadixTree database)
-{-# SPECIALISE subtreeRadixTree
-   :: RadixRoot
-   -> RadixTree DB
-   -> ResourceT IO (RadixTree DB) #-}
+{-# DEPRECATED subtreeRadixTree "The function is will be removed in the next release. Please use 'createRadixTree' instead." #-}
 subtreeRadixTree root RadixTree {..} = do
    result <- loadCold root cache _radixDatabase
    case result of
@@ -572,7 +569,7 @@ lookupMerkleizedRadixTree
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
-{-# DEPRECATED lookupMerkleizedRadixTree "The function is will be removed in the next release. Please use 'lookupRadixTree' instead." #-}
+{-# DEPRECATED lookupMerkleizedRadixTree "The function is will be removed in the next release. Please use 'contentsMerkleizedRadixTree' instead." #-}
 lookupMerkleizedRadixTree = lookupRadixTree' searchMerkleizedRadixTree
 
 -- |
@@ -582,10 +579,7 @@ lookupNonMerkleizedRadixTree
    => ByteString -- ^ Key.
    -> RadixTree database -- ^ Radix tree.
    -> m (Maybe (ByteString, RadixTree database))
-{-# SPECIALISE lookupNonMerkleizedRadixTree
-   :: ByteString
-   -> RadixTree DB
-   -> ResourceT IO (Maybe (ByteString, RadixTree DB)) #-}
+{-# DEPRECATED lookupNonMerkleizedRadixTree "The function is will be removed in the next release. Please use 'lookupRadixTree' instead." #-}
 lookupNonMerkleizedRadixTree = lookupRadixTree' searchNonMerkleizedRadixTree
 
 -- |
