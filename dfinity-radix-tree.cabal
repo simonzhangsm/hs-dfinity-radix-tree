@@ -56,6 +56,7 @@ Library
       Network.DFINITY.RadixTree.Bits
       Network.DFINITY.RadixTree.Bloom
       Network.DFINITY.RadixTree.Lenses
+      Network.DFINITY.RadixTree.Lock
       Network.DFINITY.RadixTree.Memory
       Network.DFINITY.RadixTree.Serialise
       Network.DFINITY.RadixTree.Types

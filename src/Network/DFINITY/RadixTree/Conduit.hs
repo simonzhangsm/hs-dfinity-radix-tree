@@ -27,7 +27,7 @@ import Codec.Serialise (deserialise, deserialiseOrFail)
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.BoundedChan (BoundedChan, readChan, tryWriteChan)
 import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
-import Control.Concurrent.ReadWriteLock (RWLock, acquireRead, acquireWrite, releaseRead, releaseWrite)
+import Control.Concurrent.ReadWriteLock (RWLock)
 import Control.Exception (throw)
 import Control.Monad (foldM, forM_, forever, void, when)
 import Control.Monad.IO.Class (liftIO)
@@ -46,6 +46,7 @@ import Database.LevelDB (DB)
 
 import Network.DFINITY.RadixTree.Bits
 import Network.DFINITY.RadixTree.Lenses
+import Network.DFINITY.RadixTree.Lock
 import Network.DFINITY.RadixTree.Types
 
 -- |
@@ -211,27 +212,3 @@ sinkRadixTree checkpoint chan tree@RadixTree {..} lock =
                   -- Update the parent node.
                   let buffer'' = Map.insert root' (bytes', children') buffer'
                   loop3 buffer'' targets' candidates'
-
--- |
--- Perform a read operation.
-withReadLock :: MonadResource m => RWLock -> m a -> m a
-withReadLock lock action = do
-   key <- fst <$> allocate acquireLock releaseLock
-   result <- action
-   release key
-   pure result
-   where
-   acquireLock = acquireRead lock
-   releaseLock = const $ releaseRead lock
-
--- |
--- Perform a write operation.
-withWriteLock :: MonadResource m => RWLock -> m a -> m a
-withWriteLock lock action = do
-   key <- fst <$> allocate acquireLock releaseLock
-   result <- action
-   release key
-   pure result
-   where
-   acquireLock = acquireWrite lock
-   releaseLock = const $ releaseWrite lock
