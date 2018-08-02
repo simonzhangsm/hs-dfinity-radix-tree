@@ -27,6 +27,7 @@ Library
       base16-bytestring,
       bloomfilter,
       bytestring,
+      concurrent-extra,
       conduit,
       containers,
       cryptohash-sha256,
@@ -44,6 +45,7 @@ Library
       Haskell2010
    Exposed-Modules:
       Network.DFINITY.RadixTree
+      Network.DFINITY.RadixTree.Conduit
    GHC-Options:
       -O2
       -Wall

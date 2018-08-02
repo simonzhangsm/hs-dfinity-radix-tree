@@ -1,10 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS -Wall #-}
 {-# OPTIONS -Werror=incomplete-patterns #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 -- |
 -- Module     : Network.DFINITY.RadixTree
@@ -26,7 +26,6 @@ module Network.DFINITY.RadixTree (
 
    -- ** Create
    , createRadixTree
-   , subtreeRadixTree
 
    -- ** Insert
    , insertRadixTree
@@ -39,47 +38,34 @@ module Network.DFINITY.RadixTree (
 
    -- ** Query
    , lookupRadixTree
-   , lookupMerkleizedRadixTree
-   , lookupNonMerkleizedRadixTree
 
    -- ** Test
    , isEmptyRadixTree
    , isValidRadixRoot
 
-   -- ** Stream
-   , sourceMerkleizedRadixTree
-   , sinkMerkleizedRadixTree
-
    -- ** Debug
    , contentsRadixTree
    , contentsMerkleizedRadixTree
    , contentsNonMerkleizedRadixTree
+
    , printRadixTree
    , printMerkleizedRadixTree
    , printNonMerkleizedRadixTree
 
    ) where
 
-import Codec.Serialise (deserialise, deserialiseOrFail)
-import Control.Concurrent (forkIO, killThread)
-import Control.Concurrent.BoundedChan (BoundedChan, readChan, tryWriteChan)
-import Control.Concurrent.MVar (modifyMVar_, newMVar, readMVar)
 import Control.Exception (throw)
-import Control.Monad (foldM, forM_, forever, void, when)
+import Control.Monad (foldM, forM_)
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Trans.Resource (MonadResource, ResourceT, allocate, release)
-import Crypto.Hash.SHA256 (hash)
+import Control.Monad.Trans.Resource (ResourceT)
 import Data.BloomFilter as Bloom (elem, insert, insertList)
 import Data.Bool (bool)
-import Data.ByteString.Char8 as Byte (ByteString, take)
-import Data.ByteString.Lazy (fromStrict)
-import Data.ByteString.Short (fromShort, toShort)
-import Data.Conduit (ConduitM, await, yield)
+import Data.ByteString (ByteString)
+import Data.ByteString.Short (fromShort)
 import Data.Default.Class (def)
-import Data.List as List (delete, foldl', null)
 import Data.List.NonEmpty (NonEmpty(..), fromList)
-import Data.LruCache as LRU (empty, insert, lookup)
-import Data.Map.Strict as Map ((!), delete, empty, insert, keys, lookup, member, null, singleton)
+import Data.LruCache as LRU (empty)
+import Data.Map.Strict as Map (empty)
 import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
 import Data.Tuple (swap)
 import Database.LevelDB (DB)
@@ -122,23 +108,6 @@ createRadixTree bloomSize cacheSize checkpoint database
       where
       bloom = emptyRadixBloom bloomSize
       cache = LRU.empty cacheSize
-
--- |
--- Create a radix tree from a radix tree.
-subtreeRadixTree
-   :: RadixDatabase m database
-   => RadixRoot -- ^ State root.
-   -> RadixTree database -- ^ Radix tree.
-   -> m (RadixTree database)
-{-# DEPRECATED subtreeRadixTree "The function is will be removed in the next release. Please use 'createRadixTree' instead." #-}
-subtreeRadixTree root RadixTree {..} = do
-   result <- loadCold root cache _radixDatabase
-   case result of
-      Nothing -> throw $ StateRootDoesNotExist root
-      _ -> pure $ RadixTree bloom _radixBloomSize Map.empty cache _radixCacheSize root _radixDatabase 0 root
-      where
-      bloom = emptyRadixBloom _radixBloomSize
-      cache = LRU.empty _radixCacheSize
 
 -- |
 -- Check if a radix tree is empty.
@@ -200,10 +169,10 @@ searchRadixTree flag strategy = \ key tree@RadixTree {..} -> do
             let prefixes' = prefix:prefixes
             let key' = drop n key
             -- Check the termination criteria.
-            let residue = not $ List.null overflow
+            let residue = not $ null overflow
             let bit = head key'
             let child = bool _radixLeft _radixRight bit
-            if List.null key' || residue || isNothing child
+            if null key' || residue || isNothing child
             then pure $ Right (fromList roots', fromList nodes', fromList prefixes', overflow, key', cache')
             else do
                -- Recurse.
@@ -243,7 +212,7 @@ searchNonMerkleizedRadixTree =
       loadHot _radixRoot _radixBuffer _radixCache _radixDatabase
 
 -- |
--- Insert a key and value into a radix tree.
+-- Insert a value into a radix tree.
 insertRadixTree
    :: RadixDatabase m database
    => ByteString -- ^ Key.
@@ -282,7 +251,7 @@ initializeRadixTree key value tree@RadixTree {..} =
    prefix = createPrefix $ toBits key
    node = setPrefix prefix $ Just value `setLeaf` def
    root = createRootFromNonce _radixNonce
-   bloom = Bloom.insert root _radixBloom
+   bloom = insert root _radixBloom
    nonce = _radixNonce + 1
    buffer = storeHot root node _radixBuffer
 
@@ -437,7 +406,7 @@ deleteRadixTreeNoChildrenNoParent
 deleteRadixTreeNoChildrenNoParent (_, _, _, _, _, cache) tree@RadixTree {..} =
    seq bloom $ setBloom bloom $ setBuffer buffer $ setCache cache $ setRoot state tree
    where
-   bloom = Bloom.insert defaultRoot _radixBloom
+   bloom = insert defaultRoot _radixBloom
    buffer = storeHot defaultRoot def _radixBuffer
    state = defaultRoot
 
@@ -526,31 +495,6 @@ deleteRadixTreeTwoChildren (_:|roots, node:|nodes, prefix:|_, _, _, cache) tree@
 
 -- |
 -- Lookup a value in a radix tree.
-lookupRadixTree'
-   :: RadixDatabase m database
-   => (ByteString -> RadixTree database -> m (Either RadixError RadixSearchResult)) -- ^ Search algorithm.
-   -> ByteString -- ^ Key.
-   -> RadixTree database -- ^ Radix tree.
-   -> m (Maybe (ByteString, RadixTree database))
-{-# SPECIALISE lookupRadixTree'
-   :: (ByteString -> RadixTree DB -> ResourceT IO (Either RadixError RadixSearchResult))
-   -> ByteString
-   -> RadixTree DB
-   -> ResourceT IO (Maybe (ByteString, RadixTree DB)) #-}
-lookupRadixTree' search key tree = do
-   found <- search key tree
-   case found of
-      Left err -> throw err
-      Right (_, RadixNode {..}:|_, _, prefixOverflow, keyOverflow, cache') ->
-         if not $ List.null prefixOverflow && List.null keyOverflow
-         then pure Nothing
-         else pure $ do
-            value <- _radixLeaf
-            let tree' = setCache cache' tree
-            pure (value, tree')
-
--- |
--- A convenient alias for `lookupNonMerkleizedRadixTree`.
 lookupRadixTree
    :: RadixDatabase m database
    => ByteString -- ^ Key.
@@ -560,27 +504,17 @@ lookupRadixTree
    :: ByteString
    -> RadixTree DB
    -> ResourceT IO (Maybe (ByteString, RadixTree DB)) #-}
-lookupRadixTree = lookupNonMerkleizedRadixTree
-
--- |
--- Lookup a value in a Merkleized radix tree.
-lookupMerkleizedRadixTree
-   :: RadixDatabase m database
-   => ByteString -- ^ Key.
-   -> RadixTree database -- ^ Radix tree.
-   -> m (Maybe (ByteString, RadixTree database))
-{-# DEPRECATED lookupMerkleizedRadixTree "The function is will be removed in the next release. Please use 'contentsMerkleizedRadixTree' instead." #-}
-lookupMerkleizedRadixTree = lookupRadixTree' searchMerkleizedRadixTree
-
--- |
--- Lookup a value in a non-Merkleized radix tree.
-lookupNonMerkleizedRadixTree
-   :: RadixDatabase m database
-   => ByteString -- ^ Key.
-   -> RadixTree database -- ^ Radix tree.
-   -> m (Maybe (ByteString, RadixTree database))
-{-# DEPRECATED lookupNonMerkleizedRadixTree "The function is will be removed in the next release. Please use 'lookupRadixTree' instead." #-}
-lookupNonMerkleizedRadixTree = lookupRadixTree' searchNonMerkleizedRadixTree
+lookupRadixTree key tree = do
+   found <- searchNonMerkleizedRadixTree key tree
+   case found of
+      Left err -> throw err
+      Right (_, RadixNode {..}:|_, _, prefixOverflow, keyOverflow, cache') ->
+         if not $ null prefixOverflow && null keyOverflow
+         then pure Nothing
+         else pure $ do
+            value <- _radixLeaf
+            let tree' = setCache cache' tree
+            pure (value, tree')
 
 -- |
 -- Mask a node in a Merkleized radix tree.
@@ -596,7 +530,7 @@ merkleSpoof mask = \ case
       storeHot root $ test `setChild` Just mask $ node
 
 -- |
--- Merkleize a radix tree. This will flush the buffer to disk.
+-- Merkleize a radix tree. This will flush the buffer to the database.
 merkleizeRadixTree
    :: RadixDatabase m database
    => RadixTree database-- ^ Radix tree.
@@ -639,124 +573,6 @@ merkleizeRadixTree RadixTree {..} = do
                      (root'', cache''') <- loop right cache''
                      let node' = setChildren (Just root', Just root'') node
                      storeCold node' cache''' _radixDatabase
-
--- |
--- Create a conduit from a Merkleized radix tree.
-sourceMerkleizedRadixTree
-   :: MonadResource m
-   => RadixDatabase (ConduitM () ByteString m) database
-   => [Bool] -- ^ Bit mask.
-   -> Int -- ^ LRU cache size in items.
-   -> BoundedChan RadixRoot -- ^ Terminal state root producer.
-   -> RadixTree database -- ^ Radix tree.
-   -> ConduitM () ByteString m ()
-{-# SPECIALISE sourceMerkleizedRadixTree
-   :: [Bool]
-   -> Int
-   -> BoundedChan RadixRoot
-   -> RadixTree DB
-   -> ConduitM () ByteString (ResourceT IO) () #-}
-sourceMerkleizedRadixTree mask cacheSize chan
-   | cacheSize <= 0 = throw $ InvalidArgument "invalid LRU cache size"
-   | otherwise = \ tree -> do
-      cache <- liftIO $ newMVar $ LRU.empty cacheSize
-      (,) action _ <- flip allocate killThread $ forkIO $ forever $ do
-         root <- readChan chan
-         modifyMVar_ cache $ pure . LRU.insert root ()
-      loop cache tree []
-      release action
-      where
-      loop cache tree@RadixTree {..} roots = do
-         seen <- liftIO $ readMVar cache
-         let roots' = _radixCheckpoint:roots
-         if flip any roots' $ isJust . flip LRU.lookup seen
-         then pure ()
-         else do
-            let key = fromShort _radixCheckpoint
-            result <- load _radixDatabase key
-            case result of
-               Nothing -> pure ()
-               Just bytes -> do
-                  let RadixNode {..} = deserialise $ fromStrict bytes
-                  let success = all id $ zipWith (==) mask $ toBits $ fromShort _radixCheckpoint
-                  when success $ yield bytes
-                  forM_ [_radixLeft, _radixRight] $ \ case
-                     Nothing -> pure ()
-                     Just root -> loop cache `flip` roots' $ setCheckpoint root tree
-
--- |
--- Create a Merkleized radix tree from a conduit.
-sinkMerkleizedRadixTree
-   :: MonadResource m
-   => RadixDatabase (ConduitM ByteString () m) database
-   => RadixRoot -- ^ Target state root.
-   -> BoundedChan RadixRoot -- ^ Terminal state root consumer.
-   -> RadixTree database -- ^ Radix tree.
-   -> ConduitM ByteString () m (Either [RadixRoot] (RadixTree database))
-{-# SPECIALISE sinkMerkleizedRadixTree
-   :: RadixRoot
-   -> BoundedChan RadixRoot
-   -> RadixTree DB
-   -> ConduitM ByteString () (ResourceT IO) (Either [RadixRoot] (RadixTree DB)) #-}
-sinkMerkleizedRadixTree checkpoint chan tree@RadixTree {..} =
-   loop1 Map.empty $ singleton checkpoint Nothing where
-   loop1 = \ buffer want ->
-      if Map.null want
-      then pure $ Right $ setCheckpoint checkpoint $ setRoot checkpoint tree
-      else await >>= \ case
-         Nothing -> pure $ Left $ keys want
-         Just bytes ->
-            case deserialiseOrFail $ fromStrict bytes of
-               Right RadixNode {..} -> do
-                  let key = Byte.take 20 $ hash bytes
-                  let root = toShort key
-                  let wanted = member root want
-                  exists <- if wanted
-                     then pure False
-                     else isJust <$> load _radixDatabase key
-                  if exists
-                  then loop1 buffer $ Map.delete root want
-                  else do
-                     children <- foldM step [] $ maybe id (:) _radixLeft $ maybe id (:) _radixRight []
-                     let buffer' = Map.insert root (key, bytes, children) buffer
-                     if not wanted
-                     then loop1 buffer' want
-                     else loop3 buffer' `uncurry` loop2 buffer' (want, []) root
-               _ -> loop1 buffer want
-      where
-      step accum root = do
-         valid <- isValidRadixRoot root tree
-         if valid
-         then pure accum
-         else pure $ root:accum
-   loop2 buffer accum@(want, candidates) root =
-      case Map.lookup root buffer of
-         Nothing -> accum
-         Just (key, bytes, []) -> (want, (root, key, bytes):candidates)
-         Just (_, _, children) ->
-            let want' = foldr step want children
-            in foldl' (loop2 buffer) (want', candidates) children
-      where
-      step = flip Map.insert $ Just root
-   loop3 buffer want = \ case
-      [] -> loop1 buffer want
-      (root, key, bytes):candidates -> do
-         store _radixDatabase key bytes
-         let buffer' = Map.delete root buffer
-         case want ! root of
-            Nothing -> do
-               let want' = Map.delete root want
-               loop1 buffer' want'
-            Just root' -> do
-               let want' = Map.delete root want
-               let (key', bytes', siblings') = buffer ! root'
-               let children' = List.delete root siblings'
-               if List.null children'
-               then loop3 buffer' want' $ (root', key', bytes'):candidates
-               else do
-                  let buffer'' = Map.insert root' (key', bytes', children') buffer'
-                  liftIO $ void $ tryWriteChan chan root
-                  loop3 buffer'' want' candidates
 
 -- |
 -- Get the contents of a radix tree.
