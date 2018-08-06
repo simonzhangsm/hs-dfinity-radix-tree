@@ -26,4 +26,4 @@
 
  * Abstract database to type class
  * Implement radix tree construction via conduit
- * Clean-up documentationtemporary references
+ * Clean-up documentation
