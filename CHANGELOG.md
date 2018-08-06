@@ -1,3 +1,7 @@
+0.3.1 Enzo Haussecker <enzo@dfinity.org> Mon Aug 06 2018
+
+ *  Relax constraint on radix database instance
+
 0.3.0 Enzo Haussecker <enzo@dfinity.org> Thu Aug 02 2018
 
  * Add thread safety to parallel download combinators
