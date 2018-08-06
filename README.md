@@ -13,12 +13,12 @@ Define your database as an instance of the [`RadixDatabase`](https://hackage.has
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-import Control.Monad.Trans.Resource (MonadResource)
+import Control.Monad.IO.Class (MonadIO)
 import Database.LevelDB (DB, defaultReadOptions, defaultWriteOptions, get, put)
 
 import Network.DFINITY.RadixTree
 
-instance MonadResource m => RadixDatabase m DB where
+instance MonadIO m => RadixDatabase m DB where
    load database = get database defaultReadOptions
    store database = put database defaultWriteOptions
 ```

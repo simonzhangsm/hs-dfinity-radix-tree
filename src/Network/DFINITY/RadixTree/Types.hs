@@ -26,8 +26,8 @@ import Codec.Serialise.Encoding (encodeBytes, encodeInt, encodeListLen)
 import Control.DeepSeq (NFData(..))
 import Control.Exception (Exception)
 import Control.Monad (void)
+import Control.Monad.IO.Class
 import Control.Monad.State.Strict as State (StateT, get, modify)
-import Control.Monad.Trans.Resource (MonadResource)
 import Crypto.Hash.SHA256 (hash)
 import Data.BloomFilter (Bloom)
 import Data.Bool (bool)
@@ -64,7 +64,7 @@ instance Monad m => RadixDatabase (StateT (Map ByteString ByteString) m) () wher
    load _ key = Map.lookup key <$> State.get
    store _ key = modify . insert key
 
-instance MonadResource m => RadixDatabase m DB where
+instance MonadIO m => RadixDatabase m DB where
    load database = LevelDB.get database defaultReadOptions
    store database = put database defaultWriteOptions
 
