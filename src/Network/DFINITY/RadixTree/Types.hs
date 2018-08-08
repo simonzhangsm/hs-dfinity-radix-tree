@@ -37,6 +37,7 @@ import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Short (ShortByteString, fromShort, toShort)
 import Data.Data (Data)
 import Data.Default.Class (Default(..))
+import Data.IORef
 import Data.List.NonEmpty (NonEmpty)
 import Data.LruCache (LruCache)
 import Data.Map.Strict as Map (Map, insert, lookup)
@@ -63,6 +64,10 @@ class Monad m => RadixDatabase m database where
 instance Monad m => RadixDatabase (StateT (Map ByteString ByteString) m) () where
    load _ key = Map.lookup key <$> State.get
    store _ key = modify . insert key
+
+instance MonadIO m => RadixDatabase m (IORef (Map ByteString ByteString)) where
+   load db key = Map.lookup key <$> liftIO (readIORef db)
+   store db key val = liftIO $ modifyIORef db (insert key val)
 
 instance MonadIO m => RadixDatabase m DB where
    load database = LevelDB.get database defaultReadOptions
