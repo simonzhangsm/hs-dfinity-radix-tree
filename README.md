@@ -1,9 +1,9 @@
 # dfinity-radix-tree: A generic data integrity layer.
-[![DFINITY Stiftung](https://img.shields.io/badge/made%20by-DFINITY%20Stiftung-blue.svg)](https://dfinity.org)
+[![DFINITY](https://img.shields.io/badge/made%20by-DFINITY-29abe2.svg)](https://dfinity.org)
 [![Build Status](https://travis-ci.org/dfinity-lab/hs-radix-tree.svg?branch=master)](https://travis-ci.org/dfinity-lab/hs-radix-tree)
 [![Hackage](https://img.shields.io/hackage/v/dfinity-radix-tree.svg)](https://hackage.haskell.org/package/dfinity-radix-tree)
 [![Dependencies](https://img.shields.io/hackage-deps/v/dfinity-radix-tree.svg)](http://packdeps.haskellers.com/feed?needle=dfinity-radix-tree)
-[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-29abe2.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ## Overview
 This library allows you to construct a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) on top of any underlying key–value database. It works by organizing your key–value pairs into a binary [radix tree](https://en.wikipedia.org/wiki/Radix_tree), which is well suited for storing large dictionaries of fairly random keys, and is optimized for storing keys of the same length.
