@@ -13,8 +13,8 @@ Category:           Blockchain, DFINITY, Database
 Copyright:          2018 DFINITY Stiftung
 Author:             Enzo Haussecker <enzo@dfinity.org>
 Maintainer:         DFINITY USA Research <team@dfinity.org>
-Homepage:           https://github.com/dfinity-lab/hs-radix-tree
-Bug-Reports:        https://github.com/dfinity-lab/hs-radix-tree/issues
+Homepage:           https://github.com/dfinity-lab/hs-dfinity-radix-tree
+Bug-Reports:        https://github.com/dfinity-lab/hs-dfinity-radix-tree/issues
 Tested-With:        GHC==8.4.3, GHC==8.2.2
 Build-Type:         Simple
 Cabal-Version:      >= 1.10
