@@ -1,4 +1,5 @@
 # dfinity-radix-tree: A generic data integrity layer.
+[![DFINITY Stiftung](https://img.shields.io/badge/made%20by-DFINITY%20Stiftung-blue.svg)](https://dfinity.org)
 [![Build Status](https://travis-ci.org/dfinity-lab/hs-radix-tree.svg?branch=master)](https://travis-ci.org/dfinity-lab/hs-radix-tree)
 [![Hackage](https://img.shields.io/hackage/v/dfinity-radix-tree.svg)](https://hackage.haskell.org/package/dfinity-radix-tree)
 [![Dependencies](https://img.shields.io/hackage-deps/v/dfinity-radix-tree.svg)](http://packdeps.haskellers.com/feed?needle=dfinity-radix-tree)
