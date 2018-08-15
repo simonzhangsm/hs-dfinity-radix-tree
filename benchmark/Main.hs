@@ -58,7 +58,7 @@ main :: IO ()
 main = do
    Args {..} <- cmdArgs def
    runResourceT $ do
-      let 
+      let
       handle <- open database options
       tree <- createRadixTree 262144 2048 Nothing handle
       tree' <- foldInsert tree [1..100000]
