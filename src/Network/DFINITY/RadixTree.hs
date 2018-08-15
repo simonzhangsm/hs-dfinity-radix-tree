@@ -78,6 +78,8 @@ import Network.DFINITY.RadixTree.Memory
 import Network.DFINITY.RadixTree.Types
 import Network.DFINITY.RadixTree.Utilities
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Create a radix tree.
 createRadixTree
@@ -111,6 +113,8 @@ createRadixTree bloomSize cacheSize checkpoint database
                -> LevelDB.DB
                -> ResourceT IO (RadixTree LevelDB.DB) #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Check if a radix tree is empty.
 isEmptyRadixTree
@@ -119,6 +123,8 @@ isEmptyRadixTree
 isEmptyRadixTree = (==) defaultRoot . _radixRoot
 
 {-# INLINABLE isEmptyRadixTree #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Check if a state root is valid.
@@ -136,6 +142,8 @@ isValidRadixRoot root RadixTree {..} =
                :: RadixRoot
                -> RadixTree LevelDB.DB
                -> ResourceT IO Bool #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Search for a value in a radix tree.
@@ -187,6 +195,8 @@ searchRadixTree flag strategy = \ key tree@RadixTree {..} -> do
                -> RadixTree LevelDB.DB
                -> ResourceT IO (Either RadixError RadixSearchResult) #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Search for a value in a Merkleized radix tree.
 searchMerkleizedRadixTree
@@ -203,6 +213,8 @@ searchMerkleizedRadixTree =
                -> RadixTree LevelDB.DB
                -> ResourceT IO (Either RadixError RadixSearchResult) #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Search for a value in a non-Merkleized radix tree.
 searchNonMerkleizedRadixTree
@@ -218,6 +230,8 @@ searchNonMerkleizedRadixTree =
    :: ByteString
    -> RadixTree LevelDB.DB
    -> ResourceT IO (Either RadixError RadixSearchResult) #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Insert a value into a radix tree.
@@ -247,6 +261,8 @@ insertRadixTree key value tree =
    -> RadixTree LevelDB.DB
    -> ResourceT IO (RadixTree LevelDB.DB) #-}
 
+--------------------------------------------------------------------------------
+
 -- TODO (enzo): Documentation.
 initializeRadixTree
    :: ByteString -- ^ Key.
@@ -264,6 +280,8 @@ initializeRadixTree key value tree@RadixTree {..} =
    buffer = storeHot root node _radixBuffer
 
 {-# INLINABLE initializeRadixTree #-}
+
+--------------------------------------------------------------------------------
 
 -- TODO (enzo): Documentation.
 insertRadixTreeAt
@@ -283,6 +301,8 @@ insertRadixTreeAt (_:|roots, node:|nodes, prefix:|_, _, _, cache) value tree@Rad
    state = bool _radixRoot root' $ isNothing parent
 
 {-# INLINABLE insertRadixTreeAt #-}
+
+--------------------------------------------------------------------------------
 
 -- TODO (enzo): Documentation.
 insertRadixTreeAfter
@@ -307,6 +327,8 @@ insertRadixTreeAfter (_:|roots, node:|nodes, prefix:|_, _, keyOverflow, cache) v
 
 {-# INLINABLE insertRadixTreeAfter #-}
 
+--------------------------------------------------------------------------------
+
 -- TODO (enzo): Documentation.
 insertRadixTreeBefore
    :: RadixSearchResult -- ^ Search result.
@@ -330,6 +352,8 @@ insertRadixTreeBefore (_:|roots, node:|nodes, prefix:|_, prefixOverflow, _, cach
    state = bool _radixRoot root'' $ isNothing parent
 
 {-# INLINABLE insertRadixTreeBefore #-}
+
+--------------------------------------------------------------------------------
 
 -- TODO (enzo): Documentation.
 insertRadixTreeBetween
@@ -358,6 +382,8 @@ insertRadixTreeBetween (_:|roots, node:|nodes, prefix:|_, prefixOverflow, keyOve
    state = bool _radixRoot root''' $ isNothing parent
 
 {-# INLINABLE insertRadixTreeBetween #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Delete a value from a radix tree.
@@ -412,6 +438,8 @@ deleteRadixTree key tree@RadixTree {..} =
    -> RadixTree LevelDB.DB
    -> ResourceT IO (RadixTree LevelDB.DB) #-}
 
+--------------------------------------------------------------------------------
+
 -- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenNoParent
    :: RadixSearchResult -- ^ Search result.
@@ -425,6 +453,8 @@ deleteRadixTreeNoChildrenNoParent (_, _, _, _, _, cache) tree@RadixTree {..} =
    state = defaultRoot
 
 {-# INLINABLE deleteRadixTreeNoChildrenNoParent #-}
+
+--------------------------------------------------------------------------------
 
 -- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenParentWithLeaf
@@ -446,6 +476,8 @@ deleteRadixTreeNoChildrenParentWithLeaf _ _ =
    throw $ InvalidArgument "unknown parent"
 
 {-# INLINABLE deleteRadixTreeNoChildrenParentWithLeaf #-}
+
+--------------------------------------------------------------------------------
 
 -- TODO (enzo): Documentation.
 deleteRadixTreeNoChildrenParentWithoutLeaf
@@ -472,6 +504,8 @@ deleteRadixTreeNoChildrenParentWithoutLeaf _ _ _ _ _ =
 
 {-# INLINABLE deleteRadixTreeNoChildrenParentWithoutLeaf #-}
 
+--------------------------------------------------------------------------------
+
 -- TODO (enzo): Documentation.
 deleteRadixTreeOneChild
    :: RadixSearchResult -- ^ Search result.
@@ -495,6 +529,8 @@ deleteRadixTreeOneChild (_:|roots, _:|nodes, prefix:|_, _, _, _) node@RadixNode 
 
 {-# INLINABLE deleteRadixTreeOneChild #-}
 
+--------------------------------------------------------------------------------
+
 -- TODO (enzo): Documentation.
 deleteRadixTreeTwoChildren
    :: RadixSearchResult -- ^ Search result.
@@ -512,6 +548,8 @@ deleteRadixTreeTwoChildren (_:|roots, node:|nodes, prefix:|_, _, _, cache) tree@
    state = bool _radixRoot root' $ isNothing parent
 
 {-# INLINABLE deleteRadixTreeTwoChildren #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Lookup a value in a radix tree.
@@ -537,6 +575,8 @@ lookupRadixTree key tree = do
                -> RadixTree LevelDB.DB
                -> ResourceT IO (Maybe (ByteString, RadixTree LevelDB.DB)) #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Mask a node in a Merkleized radix tree.
 merkleSpoof
@@ -550,6 +590,8 @@ merkleSpoof mask = \ case
       storeHot root $ test `setChild` Just mask $ node
 
 {-# INLINABLE merkleSpoof #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Merkleize a radix tree. This will flush the buffer to the database.
@@ -597,6 +639,8 @@ merkleizeRadixTree RadixTree {..} = do
                :: RadixTree LevelDB.DB
                -> ResourceT IO (RadixRoot, RadixTree LevelDB.DB) #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Get the contents of a radix tree.
 contentsRadixTree'
@@ -630,6 +674,8 @@ contentsRadixTree' flag strategy = \ tree@RadixTree {..} -> do
                -> RadixTree LevelDB.DB
                -> ResourceT IO [(ByteString, ByteString)] #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- A convenient alias for `contentsNonMerkleizedRadixTree`.
 contentsRadixTree
@@ -641,6 +687,8 @@ contentsRadixTree = contentsNonMerkleizedRadixTree
 {-# SPECIALISE contentsRadixTree
                :: RadixTree LevelDB.DB
                -> ResourceT IO [(ByteString, ByteString)] #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Get the contents of a Merkleized radix tree.
@@ -656,6 +704,8 @@ contentsMerkleizedRadixTree =
                :: RadixTree LevelDB.DB
                -> ResourceT IO [(ByteString, ByteString)] #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Get the contents of a non-Merkleized radix tree.
 contentsNonMerkleizedRadixTree
@@ -669,6 +719,8 @@ contentsNonMerkleizedRadixTree =
 {-# SPECIALISE contentsNonMerkleizedRadixTree
                :: RadixTree LevelDB.DB
                -> ResourceT IO [(ByteString, ByteString)] #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Print a radix tree.
@@ -701,6 +753,8 @@ printRadixTree' flag strategy = \ tree@RadixTree {..} -> do
                -> RadixTree LevelDB.DB
                -> ResourceT IO () #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- A convenient alias for `printNonMerkleizedRadixTree`.
 printRadixTree
@@ -713,6 +767,8 @@ printRadixTree = printNonMerkleizedRadixTree
 {-# SPECIALISE printRadixTree
                :: RadixTree LevelDB.DB
                -> ResourceT IO () #-}
+
+--------------------------------------------------------------------------------
 
 -- |
 -- Print a Merkleized radix tree.
@@ -729,6 +785,8 @@ printMerkleizedRadixTree =
                :: RadixTree LevelDB.DB
                -> ResourceT IO () #-}
 
+--------------------------------------------------------------------------------
+
 -- |
 -- Print a non-Merkleized radix tree.
 printNonMerkleizedRadixTree
@@ -743,3 +801,5 @@ printNonMerkleizedRadixTree =
 {-# SPECIALISE printNonMerkleizedRadixTree
                :: RadixTree LevelDB.DB
                -> ResourceT IO () #-}
+
+--------------------------------------------------------------------------------
