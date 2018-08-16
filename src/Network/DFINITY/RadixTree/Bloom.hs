@@ -16,7 +16,7 @@ import GHC.Word (Word32(..))
 import Network.DFINITY.RadixTree.Types
 
 emptyRadixBloom :: Int -> RadixBloom
-emptyRadixBloom = empty hash 
+emptyRadixBloom = empty hash
 
 hash :: RadixRoot -> [Word32]
 hash = \ case

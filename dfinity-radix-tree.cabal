@@ -36,6 +36,7 @@ Library
       ghc-prim,
       lens-simple,
       leveldb-haskell,
+      lmdb-simple,
       lrucaching,
       mtl,
       resourcet,
@@ -94,6 +95,8 @@ Executable dfinity-radix-tree-benchmarks
       data-default-class,
       dfinity-radix-tree,
       leveldb-haskell,
+      lmdb-simple,
+      temporary,
       resourcet
    Default-Language:
       Haskell2010
@@ -101,6 +104,7 @@ Executable dfinity-radix-tree-benchmarks
       -O2
       -Wall
       -rtsopts
+      -threaded
    HS-Source-Dirs:
       benchmark
    Main-Is:

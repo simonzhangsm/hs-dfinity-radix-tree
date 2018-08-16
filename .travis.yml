@@ -4,6 +4,7 @@ addons:
   apt:
     packages:
     - libleveldb-dev
+    - liblmdb-dev
 
 ghc:
   - 8.2
