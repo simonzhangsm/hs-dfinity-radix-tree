@@ -227,9 +227,9 @@ searchNonMerkleizedRadixTree =
       loadHot _radixRoot _radixBuffer _radixCache _radixDatabase
 
 {-# SPECIALISE searchNonMerkleizedRadixTree
-   :: ByteString
-   -> RadixTree LevelDB.DB
-   -> ResourceT IO (Either RadixError RadixSearchResult) #-}
+               :: ByteString
+               -> RadixTree LevelDB.DB
+               -> ResourceT IO (Either RadixError RadixSearchResult) #-}
 
 --------------------------------------------------------------------------------
 
@@ -256,10 +256,10 @@ insertRadixTree key value tree =
          pure $ insertRadixTreeBetween result value tree
 
 {-# SPECIALISE insertRadixTree
-   :: ByteString
-   -> ByteString
-   -> RadixTree LevelDB.DB
-   -> ResourceT IO (RadixTree LevelDB.DB) #-}
+               :: ByteString
+               -> ByteString
+               -> RadixTree LevelDB.DB
+               -> ResourceT IO (RadixTree LevelDB.DB) #-}
 
 --------------------------------------------------------------------------------
 
@@ -434,9 +434,9 @@ deleteRadixTree key tree@RadixTree {..} =
       Right _ -> pure tree
 
 {-# SPECIALISE deleteRadixTree
-   :: ByteString
-   -> RadixTree LevelDB.DB
-   -> ResourceT IO (RadixTree LevelDB.DB) #-}
+               :: ByteString
+               -> RadixTree LevelDB.DB
+               -> ResourceT IO (RadixTree LevelDB.DB) #-}
 
 --------------------------------------------------------------------------------
 
@@ -667,6 +667,7 @@ contentsRadixTree' flag strategy = \ tree@RadixTree {..} -> do
                   let tree' = setRoot root tree
                   let prefix'' = prefix' ++ [test]
                   loop tree' prefix'' accum''
+
 {-# SPECIALISE contentsRadixTree'
                :: Bool
                -> (RadixTree LevelDB.DB
