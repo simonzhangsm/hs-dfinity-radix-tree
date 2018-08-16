@@ -120,7 +120,7 @@ createRadixTree bloomSize cacheSize checkpoint database
 isEmptyRadixTree
    :: RadixTree database -- ^ Radix tree.
    -> Bool
-isEmptyRadixTree db = _radixRoot db == defaultRoot
+isEmptyRadixTree tree = _radixRoot tree == defaultRoot
 
 {-# INLINABLE isEmptyRadixTree #-}
 
