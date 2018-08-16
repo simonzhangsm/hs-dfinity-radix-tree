@@ -45,13 +45,13 @@ isDivisibleBy :: (Integral i) => i -> i -> Bool
 isDivisibleBy a b = (a `mod` b) == 0
 
 foldN
-   :: (RadixDatabase m db, Monad n)
+   :: (RadixDatabase m database, Monad n)
    => Int
    -> (forall a. m a -> n a)
-   -> (RadixTree db -> ByteString -> m (RadixTree db))
-   -> RadixTree db
+   -> (RadixTree database -> ByteString -> m (RadixTree database))
+   -> RadixTree database
    -> [Word32]
-   -> n (RadixTree db)
+   -> n (RadixTree database)
 foldN _ _      _      tree [] = pure tree
 foldN n commit action tree xs = do
   let toKey = hashlazy . toLazyByteString . word32BE
@@ -60,20 +60,20 @@ foldN n commit action tree xs = do
   foldN n commit action tree' (drop n xs)
 
 foldInsert
-  :: (RadixDatabase m db, Monad n)
+  :: (RadixDatabase m database, Monad n)
   => (forall a. m a -> n a)
-  -> RadixTree db
+  -> RadixTree database
   -> [Word32]
-  -> n (RadixTree db)
+  -> n (RadixTree database)
 foldInsert commit
   = foldN 2000 commit (\db key -> insertRadixTree key key db)
 
 foldDelete
-  :: (RadixDatabase m db, Monad n)
+  :: (RadixDatabase m database, Monad n)
   => (forall a. m a -> n a)
-  -> RadixTree db
+  -> RadixTree database
   -> [Word32]
-  -> n (RadixTree db)
+  -> n (RadixTree database)
 foldDelete commit
   = foldN 2000 commit (\db key -> deleteRadixTree key db)
 

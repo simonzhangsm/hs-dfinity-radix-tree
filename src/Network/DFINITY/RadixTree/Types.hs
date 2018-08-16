@@ -70,9 +70,9 @@ type RadixBuffer = Map RadixRoot RadixNode
 
 type RadixCache = LruCache RadixRoot RadixNode
 
-class Monad m => RadixDatabase m db where
-   load :: db -> ByteString -> m (Maybe ByteString)
-   store :: db -> ByteString -> ByteString -> m ()
+class Monad m => RadixDatabase m database where
+   load  :: database -> ByteString -> m (Maybe ByteString)
+   store :: database -> ByteString -> ByteString -> m ()
 
 instance Monad m => RadixDatabase (StateT (Map ByteString ByteString) m) () where
    load _ key = Map.lookup key <$> StateT.get
