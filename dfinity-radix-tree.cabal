@@ -91,11 +91,13 @@ Executable dfinity-radix-tree-benchmarks
       base >=4.10 && <5,
       bytestring,
       cmdargs,
+      criterion,
       cryptohash-sha256,
       data-default-class,
       dfinity-radix-tree,
       leveldb-haskell,
-      lmdb-simple,           
+      lmdb-simple,
+      temporary,
       resourcet
    Default-Language:
       Haskell2010
@@ -103,6 +105,7 @@ Executable dfinity-radix-tree-benchmarks
       -O2
       -Wall
       -rtsopts
+      -threaded
    HS-Source-Dirs:
       benchmark
    Main-Is:

@@ -70,9 +70,9 @@ type RadixBuffer = Map RadixRoot RadixNode
 
 type RadixCache = LruCache RadixRoot RadixNode
 
-class Monad m => RadixDatabase m database where
-   load :: database -> ByteString -> m (Maybe ByteString)
-   store :: database -> ByteString -> ByteString -> m ()
+class Monad m => RadixDatabase m db where
+   load :: db -> ByteString -> m (Maybe ByteString)
+   store :: db -> ByteString -> ByteString -> m ()
 
 instance Monad m => RadixDatabase (StateT (Map ByteString ByteString) m) () where
    load _ key = Map.lookup key <$> StateT.get
@@ -95,17 +95,6 @@ instance RadixDatabase
          (LMDB.Database ByteString ByteString) where
   load db key = LMDB.get db key
   store db key val = LMDB.put db key (Just val)
-
-instance ( MonadReader (LMDB.Environment LMDB.ReadWrite) m, MonadIO m
-         ) => RadixDatabase m (LMDB.Database ByteString ByteString) where
-  load db key = do
-    env <- ask
-    liftIO $ LMDB.readWriteTransaction env $ do
-      LMDB.get db key
-  store db key val = do
-    env <- ask
-    liftIO $ LMDB.readWriteTransaction env $ do
-      LMDB.put db key (Just val)
 
 data RadixError
    = InvalidArgument String
