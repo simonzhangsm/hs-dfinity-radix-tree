@@ -91,7 +91,6 @@ Executable dfinity-radix-tree-benchmarks
       base >=4.10 && <5,
       bytestring,
       cmdargs,
-      criterion,
       cryptohash-sha256,
       data-default-class,
       dfinity-radix-tree,

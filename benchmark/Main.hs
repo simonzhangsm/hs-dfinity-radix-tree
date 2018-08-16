@@ -22,8 +22,6 @@ import Data.Data (Data)
 import System.Console.CmdArgs (cmdArgs)
 import System.IO.Temp (withSystemTempDirectory)
 
-import qualified Criterion
-
 import qualified Database.LevelDB as LevelDB
 import qualified Database.LMDB.Simple as LMDB
 

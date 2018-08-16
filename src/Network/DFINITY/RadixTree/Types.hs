@@ -51,8 +51,6 @@ import qualified Data.ByteString.Base16 as Base16
 import Control.Monad.State.Strict (StateT)
 import qualified Control.Monad.State.Strict as StateT
 
-import Control.Monad.Reader.Class (MonadReader (ask))
-
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
