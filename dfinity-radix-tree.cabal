@@ -109,3 +109,23 @@ Executable dfinity-radix-tree-benchmarks
       benchmark
    Main-Is:
       Main.hs
+
+test-suite property-tests
+   type: exitcode-stdio-1.0
+   Build-Depends:
+      base >=4.10 && <5,
+      dfinity-radix-tree,
+      bytestring,
+      QuickCheck,
+      mtl,
+      containers
+   Default-Language:
+      Haskell2010
+   GHC-Options:
+      -O2
+      -Wall
+   HS-Source-Dirs:
+      test
+   Main-Is:
+      props.hs
+
