@@ -87,7 +87,7 @@ Executable dfinity-radix-tree-benchmarks
    Main-Is:
       Main.hs
 
-test-suite property-tests
+test-suite tests
    type: exitcode-stdio-1.0
    Build-Depends:
       base >=4.10 && <5,

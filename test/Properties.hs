@@ -22,10 +22,12 @@ module Properties (tests) where
 
 import qualified Data.Map as M
 import Data.ByteString.Char8 (ByteString, pack)
+import Data.ByteString.Short (fromShort)
 import Test.QuickCheck
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Data.List
+import Data.Bifunctor
 import Control.Monad.State.Strict
 
 import Network.DFINITY.RadixTree
@@ -53,8 +55,9 @@ generateOps = do
         , (1, Delete <$> pickKey)
         , (2, Lookup <$> pickKey)
         ]
-  where
-    arbBS = pack <$> arbitrary
+
+arbBS :: Gen ByteString
+arbBS = pack <$> arbitrary
 
 
 runPure :: [Op] -> [Maybe ByteString]
@@ -87,8 +90,64 @@ runRadix ops0 = evalState (initTree >>= go ops0) M.empty
             Just (v,t') -> (Just v :)  <$> go ops t'
 
 prop_lookup :: Property
-prop_lookup = forAll generateOps $ \ops ->
+prop_lookup  = forAll generateOps $ \ops ->
     runPure ops === runRadix ops
+
+{-
+We want to test if two different ways of generating the same map yield the same
+state root. We first generate one final state (a Data.Map). Then we generate two
+different set of operations that should yield that state. Then we run them and
+compare the output.
+-}
+
+genMap :: Gen (M.Map ByteString ByteString)
+genMap = M.fromList . map (bimap pack pack) . M.toList <$> arbitrary
+
+genOpsForMap :: M.Map ByteString ByteString -> Gen [Op]
+genOpsForMap m = do
+    inserts <- forM (M.toList m) $ \(k,v) -> do
+        ops <- genOpsForKey k
+        return $ ops ++ [ Insert k v ]
+    -- Extra keys (which we delete as the last action)
+    extra_keys <- listOf $ arbBS `suchThat` (`M.notMember` m)
+    deletes <- forM extra_keys $ \k -> do
+        ops <- genOpsForKey k
+        return $ ops ++ [ Delete k ]
+    interleaves (inserts ++ deletes)
+  where
+    genOpsForKey k = listOf (oneof [ Insert k <$> arbBS , pure (Delete k) ])
+
+
+-- TODO
+interleaves :: [[a]] -> Gen [a]
+interleaves xss = frequency'
+    [ (length (x:xs), (x:) <$> interleaves (xs : xss))
+    | ((x:xs):xss) <- rots xss ]
+ where
+   frequency' [] = return []
+   frequency'  xs = frequency xs
+   rots xs = tail $ zipWith (++) (tails xs) (inits xs)
+
+
+type TreeGenOps = [ (ByteString, [Maybe ByteString]) ]
+
+prop_stateRoot :: Property
+prop_stateRoot = forAll genMap $ \m ->
+    forAll (genOpsForMap m) $ \ops1 ->
+    forAll (genOpsForMap m) $ \ops2 ->
+    run ops1 === run ops2
+  where
+    run :: [Op] -> ByteString
+    run ops0 = evalState (initTree >>= go ops0) M.empty
+      where
+        initTree :: M (RadixTree ())
+        initTree = createRadixTree 262144 2028 Nothing ()
+
+        go :: [Op] -> RadixTree () -> M ByteString
+        go []                 t = fromShort . fst <$> merkleizeRadixTree t
+        go (Insert k v : ops) t = insertRadixTree k v t >>= go ops
+        go (Delete k   : ops) t = deleteRadixTree k t   >>= go ops
+        go (Lookup _   : _  ) _ = error "no lookup in this test please"
 
 tests :: TestTree
 tests = testGroup "Property tests"
