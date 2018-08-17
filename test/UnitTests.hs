@@ -6,7 +6,7 @@
 
 {-# OPTIONS -Wall #-}
 
-module Main where
+module UnitTests where
 
 import Control.Arrow (first)
 import Control.Monad (foldM_, mzero, void)
@@ -17,23 +17,15 @@ import Data.ByteString.Base16 (decode, encode)
 import Data.ByteString.Char8 (ByteString, unpack)
 import Data.ByteString.Lazy.Char8 as Lazy (readFile)
 import Data.ByteString.Short (fromShort)
-import Data.Default.Class (Default(..))
-import Data.HashMap.Strict as HashMap (elems, lookup)
+import Data.HashMap.Strict as HashMap (lookup, toList)
 import Data.Map.Strict (Map, empty)
 import Data.Text as Text (Text, drop)
 import Data.Text.Encoding (encodeUtf8)
-import System.Console.CmdArgs (Data, cmdArgs)
+import Test.Tasty
+import Test.Tasty.HUnit
 
 import Network.DFINITY.RadixTree
 
-data Args
-   = Args
-   { json :: FilePath
-   , test :: String
-   } deriving Data
-
-instance Default Args where
-   def = Args "test/tests.json" "*"
 
 data Op
    = Insert ByteString ByteString
@@ -103,16 +95,16 @@ step tree op = do
    where
    throw err = fail . concat . zipWith mappend err . map show
 
-main :: IO ()
-main = do
-   Args {..} <- cmdArgs def
-   contents <- Lazy.readFile json
-   case eitherDecode contents of
-      Left err -> fail err
-      Right vctors -> void $ flip runStateT empty $ do
-         tree <- createRadixTree 262144 2048 Nothing ()
-         if test == "*"
-         then foldM_ step tree `mapM_` elems vctors
-         else case HashMap.lookup test vctors of
-            Nothing -> fail $ "Unknown test vector " ++ show test
-            Just ops -> foldM_ step tree $ concat [ops]
+runTest :: [Op] -> IO ()
+runTest ops = void $ flip runStateT empty $ do
+   tree <- createRadixTree 262144 2048 Nothing ()
+   foldM_ step tree ops
+
+tests :: IO TestTree
+tests = do
+    contents <- Lazy.readFile "test/tests.json"
+    vctors <- either fail return $ eitherDecode contents
+    return $ testGroup "unitTests"
+      [ testCase (name) $ runTest ops
+      | (name, ops) <- HashMap.toList vctors
+      ]

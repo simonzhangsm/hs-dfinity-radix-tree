@@ -63,29 +63,6 @@ Library
       Network.DFINITY.RadixTree.Types
       Network.DFINITY.RadixTree.Utilities
 
-Executable dfinity-radix-tree-unit-tests
-   Build-Depends:
-      aeson,
-      base >=4.10 && <5,
-      base16-bytestring,
-      bytestring,
-      cmdargs,
-      containers,
-      data-default-class,
-      dfinity-radix-tree,
-      mtl,
-      text,
-      unordered-containers
-   Default-Language:
-      Haskell2010
-   GHC-Options:
-      -O2
-      -Wall
-   HS-Source-Dirs:
-      test
-   Main-Is:
-      Main.hs
-
 Executable dfinity-radix-tree-benchmarks
    Build-Depends:
       base >=4.10 && <5,
@@ -118,7 +95,14 @@ test-suite property-tests
       bytestring,
       QuickCheck,
       mtl,
-      containers
+      containers,
+      aeson,
+      base16-bytestring,
+      text,
+      unordered-containers,
+      tasty,
+      tasty-hunit,
+      tasty-quickcheck
    Default-Language:
       Haskell2010
    GHC-Options:
@@ -126,6 +110,9 @@ test-suite property-tests
       -Wall
    HS-Source-Dirs:
       test
+   Other-Modules:
+      UnitTests,
+      Properties
    Main-Is:
-      props.hs
+      tests.hs
 

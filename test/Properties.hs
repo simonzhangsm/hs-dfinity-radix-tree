@@ -18,14 +18,15 @@ You can sample what 'generateOps' produces by opening this file in ghci
 (e.g. cabal new-repl property-tests) and then running @sample generateOps@.
 
 -}
-module Main where
+module Properties (tests) where
 
 import qualified Data.Map as M
 import Data.ByteString.Char8 (ByteString, pack)
 import Test.QuickCheck
+import Test.Tasty
+import Test.Tasty.QuickCheck
 import Data.List
 import Control.Monad.State.Strict
-import System.Exit
 
 import Network.DFINITY.RadixTree
 
@@ -85,11 +86,11 @@ runRadix ops0 = evalState (initTree >>= go ops0) M.empty
             Nothing     -> (Nothing :) <$> go ops t
             Just (v,t') -> (Just v :)  <$> go ops t'
 
-main_prop :: Property
-main_prop = forAll generateOps $ \ops ->
+prop_lookup :: Property
+prop_lookup = forAll generateOps $ \ops ->
     runPure ops === runRadix ops
 
-main :: IO ()
-main = quickCheckResult main_prop >>= \case
-    Success {} -> exitSuccess
-    _          -> exitFailure
+tests :: TestTree
+tests = testGroup "Property tests"
+    [ testProperty "lookup" prop_lookup
+    ]
