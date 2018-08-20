@@ -27,6 +27,8 @@ import qualified Database.LMDB.Simple as LMDB
 
 import Network.DFINITY.RadixTree
 
+--------------------------------------------------------------------------------
+
 data Args
   = Args
     { lmdb             :: !Bool
@@ -38,6 +40,8 @@ data Args
 
 instance Default Args where
    def = Args False Nothing False Nothing
+
+--------------------------------------------------------------------------------
 
 isDivisibleBy :: (Integral i) => i -> i -> Bool
 isDivisibleBy a b = (a `mod` b) == 0
@@ -75,12 +79,16 @@ foldDelete
 foldDelete commit
   = foldN 2000 commit (\db key -> deleteRadixTree key db)
 
+--------------------------------------------------------------------------------
+
 withDatabasePath :: Maybe FilePath -> String -> (FilePath -> IO a) -> IO a
 withDatabasePath Nothing suffix callback = do
   let name = "dfinity-radix-tree-benchmark-" ++ suffix
   withSystemTempDirectory name callback
 withDatabasePath (Just fp) _ callback = do
   callback fp
+
+--------------------------------------------------------------------------------
 
 benchmarkLevelDB :: Args -> IO ()
 benchmarkLevelDB args = do
@@ -106,18 +114,45 @@ benchmarkLMDB args = do
     tree3 <- foldDelete runRW tree2 [1 .. 100000]
     liftIO (print (isEmptyRadixTree tree3))
 
+--------------------------------------------------------------------------------
+
+-- FIXME: maybe move to hs-dfinity-common or whatever; I can see this
+--        code getting duplicated
+
+logError, logWarning, logNote :: [String] -> IO ()
+logError   msg = putStrLn ("\ESC[31m[ERROR]   " ++ mconcat msg ++ "\ESC[0m")
+logWarning msg = putStrLn ("\ESC[33m[WARNING] " ++ mconcat msg ++ "\ESC[0m")
+logNote    msg = putStrLn ("\ESC[34m[NOTE]    " ++ mconcat msg ++ "\ESC[0m")
+
+flag :: String -> String
+flag s = "\ESC[1m" ++ s ++ "\ESC[21m"
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
   args <- cmdArgs def
   when (not (lmdb args) && isJust (lmdb_database args)) $ do
-    putStrLn "[WARNING] --lmdb-database specified but not --lmdb"
+    logWarning [ "ignoring argument: "
+               , flag "--lmdb-database"
+               , " was specified but not "
+               , flag "--lmdb"
+               ]
   when (not (leveldb args) && isJust (leveldb_database args)) $ do
-    putStrLn "[WARNING] --leveldb-database specified but not --leveldb"
+    logWarning [ "ignoring argument: "
+               , flag "--leveldb-database"
+               , " was specified but not "
+               , flag "--leveldb"
+               ]
   when (not (lmdb args) && not (leveldb args)) $ do
-    putStrLn "[NOTE] neither --lmdb nor --leveldb was specified, quitting"
+    logError [ "neither ", flag "--lmdb", " nor ", flag "--leveldb"
+             , " was specified, quitting"
+             ]
   when (leveldb args) $ do
-    putStrLn "[NOTE] benchmarking LevelDB"
+    logNote ["benchmarking LevelDB"]
     benchmarkLevelDB args
   when (lmdb args) $ do
-    putStrLn "[NOTE] benchmarking LMDB"
+    logNote ["benchmarking LMDB"]
     benchmarkLMDB args
+
+--------------------------------------------------------------------------------
